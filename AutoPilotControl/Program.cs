@@ -39,6 +39,7 @@ namespace AutoPilotControl
 			s_display = new Gdew0154M09(0, 15, 4, spiDevice, 9, s_GpioController, false);
 			s_display.Clear(0);
 
+			s_display.SetInvertMode(true);
 			// Draw a cross
 			for (int i = 0; i < s_display.Width; i++)
 			{

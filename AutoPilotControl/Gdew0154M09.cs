@@ -101,6 +101,10 @@ namespace AutoPilotControl
 			int bits = Width * Height / 8;
 
 			_bitBuffer = new byte[bits];
+			////_resetPin.Write(PinValue.Low);
+			////Thread.Sleep(100); // It's not documented how long we have to wait
+			////_resetPin.Write(PinValue.High);
+			////Thread.Sleep(10);
 			RunInitSequence();
 		}
 
@@ -127,6 +131,22 @@ namespace AutoPilotControl
 		{
 			_commandDataPin.Write(PinValue.High);
 			_bus.WriteByte(dataByte);
+		}
+
+		/// <summary>
+		/// Inverts the display (black becomes white and white becomes black)
+		/// </summary>
+		/// <param name="invert">True = Background is white, false = Background is black</param>
+		public void SetInvertMode(bool invert)
+		{
+			if (invert)
+			{
+				WriteCommandSequence(0x50, 0xC7);
+			}
+			else
+			{
+				WriteCommandSequence(0x50, 0xD7);
+			}
 		}
 
 		private void RunInitSequence()
@@ -160,6 +180,16 @@ namespace AutoPilotControl
 				}
 
 				WaitNotBusy();
+			}
+		}
+
+		public void WriteCommandSequence(byte cmd, params byte[] data)
+		{
+			WaitNotBusy();
+			WriteCommand(cmd);
+			for (int i = 0; i < data.Length; i++)
+			{
+				WriteData(data[i]);
 			}
 		}
 
