@@ -349,25 +349,13 @@ namespace AutoPilotControl
 		public void UpdateScreen()
 		{
 			WaitReady();
-			WriteCommand(0x10);
-			for (int i = 0; i < _bitBuffer.BufferByteCount; i++)
-			{
-				WriteData(_bitBuffer[i]);
-			}
-
-			Thread.Sleep(2);
-			WaitReady();
 			WriteCommand(0x13);
-			for (int i = 0; i < _bitBuffer.BufferByteCount; i++)
-			{
-				WriteData(_bitBuffer[i]);
-			}
+			_bus.Write(_bitBuffer.Buffer);
 
 			Thread.Sleep(2);
 
 			WriteCommand(0x12);
 			WaitReady();
-			Thread.Sleep(10);
 		}
 
 		public void Dispose()
