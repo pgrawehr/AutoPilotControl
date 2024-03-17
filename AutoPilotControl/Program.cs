@@ -37,7 +37,16 @@ namespace AutoPilotControl
 
 			spiDevice = SpiDevice.Create(connectionSettings);
 			s_display = new Gdew0154M09(0, 15, 4, spiDevice, 9, s_GpioController, false);
-			s_display.Clear();
+			s_display.Clear(0);
+
+			// Draw a cross
+			for (int i = 0; i < s_display.Width; i++)
+			{
+				s_display.SetPixel(i, i, 1);
+				s_display.SetPixel(s_display.Width - i - 1, i, 1);
+			}
+
+			s_display.UpdateScreen();
 
 			while (topButton.Read() == PinValue.High)
 			{

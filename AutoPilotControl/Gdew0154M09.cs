@@ -19,7 +19,7 @@ namespace AutoPilotControl
 			0x60, 1, 0x00, //Tcon setting
 			0xe3, 1, 0x00,
 			0x04, 0, //Power on
-			0x00, 0x82, 0xff, 0x0e, 160, //panel setting (with delay bit)
+			// 0x00, 0x82, 0xff, 0x0e, 160, //panel setting (with delay bit)
 
 			0x20, 56, 0x01, 0x04, 0x04, 0x03, 0x01, 0x01, 0x01,
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
@@ -163,15 +163,42 @@ namespace AutoPilotControl
 			}
 		}
 
-		public void Clear()
+		public void Clear(byte pattern = 0)
 		{
-			//... Clear buffer
+			for (int i = 0; i < _bitBuffer.Length; i++)
+			{
+				_bitBuffer[i] = pattern;
+			}
 			UpdateScreen();
 		}
 
 		public void SetPixel(int x, int y, int color)
 		{
+			if (x < 0 || x >= Width)
+			{
+				throw new ArgumentOutOfRangeException(nameof(x));
+			}
 
+			if (y < 0 || y >= Height)
+			{
+				throw new ArgumentOutOfRangeException(nameof(y));
+			}
+
+			int byteOffset = (y * 25) + (x / 8);
+			int bit = x % 8;
+			bit = 0x80 >> bit;
+			byte b = _bitBuffer[byteOffset];
+			if (color > 0)
+			{
+				// set pixel black
+				b |= (byte)bit;
+			}
+			else
+			{
+				b &= (byte)~bit;
+			}
+
+			_bitBuffer[byteOffset] = b;
 		}
 
 		public void UpdateScreen()
@@ -184,16 +211,17 @@ namespace AutoPilotControl
 			}
 
 			Thread.Sleep(2);
+			WaitNotBusy();
 			WriteCommand(0x13);
 			for (int i = 0; i < _bitBuffer.Length; i++)
 			{
-				WriteData(0xff);
+				WriteData(_bitBuffer[i]);
 			}
 
 			Thread.Sleep(2);
 
-			WriteCommand(0x4); // Power on
 			WriteCommand(0x12);
+			WaitNotBusy();
 			Thread.Sleep(10);
 		}
 
