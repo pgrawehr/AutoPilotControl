@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Device.Gpio;
 using System.Device.Spi;
+using System.Drawing;
 using System.Threading;
+using Iot.Device.EPaper.Buffers;
+using Iot.Device.EPaper.Drivers;
 
 namespace AutoPilotControl
 {
-	public sealed class Gdew0154M09 : IDisposable
+	public sealed class Gdew0154M09 : IDisposable, IEPaperDisplay
 	{
 		private readonly byte[] _initSequence =
 		{
@@ -70,7 +73,10 @@ namespace AutoPilotControl
 		private readonly GpioController _controller;
 		private readonly bool _shouldDispose;
 
-		private byte[] _bitBuffer;
+		private int _drawPositionX;
+		private int _drawPositionY;
+
+		private FrameBuffer1BitPerPixel _bitBuffer;
 
 		public Gdew0154M09(int resetPin, int commandDataPin, int busyPin, SpiDevice bus, int csPin = -1, GpioController controller = null, bool shouldDispose = true)
 		{
@@ -86,6 +92,8 @@ namespace AutoPilotControl
 				_shouldDispose = true;
 			}
 
+			_drawPositionX = 0;
+			_drawPositionY = 0;
 			_resetPin = _controller.OpenPin(resetPin, PinMode.Output);
 			_resetPin.Write(PinValue.High); // Reset is active low, and we're not resetting by default
 			_commandDataPin = _controller.OpenPin(commandDataPin, PinMode.Output);
@@ -100,7 +108,8 @@ namespace AutoPilotControl
 
 			int bits = Width * Height / 8;
 
-			_bitBuffer = new byte[bits];
+			_bitBuffer = new FrameBuffer1BitPerPixel(Height, Width);
+			_bitBuffer.StartPoint = new Point(0, 0);
 			////_resetPin.Write(PinValue.Low);
 			////Thread.Sleep(100); // It's not documented how long we have to wait
 			////_resetPin.Write(PinValue.High);
@@ -111,17 +120,52 @@ namespace AutoPilotControl
 		public int Width => 200;
 		public int Height => 200;
 
-		private void WaitNotBusy()
+		public IFrameBuffer FrameBuffer => _bitBuffer;
+		public bool PagedFrameDrawEnabled => false;
+
+		public bool WaitReady(int waitingTime, CancellationTokenSource cancellationToken)
 		{
-			while (_busyPin.Read() == PinValue.Low)
-			{
-				Thread.Sleep(1);
-			}
+			if (cancellationToken == default)
+            {
+                if (waitingTime < 0)
+                {
+                    throw new ArgumentNullException(nameof(cancellationToken), $"{nameof(cancellationToken)} cannot be null with {nameof(waitingTime)} < 0");
+                }
+
+                cancellationToken = new CancellationTokenSource(waitingTime);
+            }
+
+            while (!cancellationToken.IsCancellationRequested && _busyPin.Read() == PinValue.Low)
+            {
+                cancellationToken.Token.WaitHandle.WaitOne(5, true);
+            }
+
+            return !cancellationToken.IsCancellationRequested;
+		}
+
+		public void WaitReady()
+		{
+			WaitReady(1000, null);
+		}
+
+		public void BeginFrameDraw()
+		{
+			// Nothing to do?
+		}
+
+		public bool NextFramePage()
+		{
+			throw new NotImplementedException();
+		}
+
+		public void EndFrameDraw()
+		{
+			UpdateScreen();
 		}
 
 		private void WriteCommand(byte commandByte)
 		{
-			WaitNotBusy();
+			WaitReady();
 			_commandDataPin.Write(PinValue.Low);
 			_bus.WriteByte(commandByte);
 			_commandDataPin.Write(PinValue.High);
@@ -179,13 +223,13 @@ namespace AutoPilotControl
 					Thread.Sleep((ms == 255 ? 500 : ms));
 				}
 
-				WaitNotBusy();
+				WaitReady();
 			}
 		}
 
 		public void WriteCommandSequence(byte cmd, params byte[] data)
 		{
-			WaitNotBusy();
+			WaitReady();
 			WriteCommand(cmd);
 			for (int i = 0; i < data.Length; i++)
 			{
@@ -195,23 +239,94 @@ namespace AutoPilotControl
 
 		public void Clear(byte pattern = 0)
 		{
-			for (int i = 0; i < _bitBuffer.Length; i++)
+			for (int i = 0; i < _bitBuffer.BufferByteCount; i++)
 			{
 				_bitBuffer[i] = pattern;
 			}
 			UpdateScreen();
 		}
 
+		public void Clear(bool triggerPageRefresh = false)
+		{
+			for (int i = 0; i < _bitBuffer.BufferByteCount; i++)
+			{
+				_bitBuffer[i] = 0;
+			}
+
+			if (triggerPageRefresh)
+			{
+				UpdateScreen();
+			}
+		}
+
+		public void Flush()
+		{
+			UpdateScreen();
+		}
+
+		public bool PerformFullRefresh()
+		{
+			UpdateScreen();
+			return true;
+		}
+
+		public bool PerformPartialRefresh()
+		{
+			// TODO: This should be possible in a more performant way
+			UpdateScreen();
+			return true;
+		}
+
+		public void SetPosition(int x, int y)
+		{
+			_drawPositionX = x;
+			_drawPositionY = y;
+		}
+
+		public void DrawPixel(int x, int y, Color color)
+		{
+			SetPixel(x, y, color == Color.Black ? 0 : 1);
+		}
+
+		public void SendCommand(params byte[] command)
+		{
+			if (command == null)
+			{
+				throw new ArgumentNullException();
+			}
+
+			if (command.Length != 1)
+			{
+				throw new ArgumentException();
+			}
+
+			WriteCommand(command[0]);
+		}
+
+		public void SendData(params byte[] data)
+		{
+			if (data == null)
+			{
+				throw new ArgumentNullException();
+			}
+
+			for (int i = 0; i < data.Length; i++)
+			{
+				WriteData(data[i]);
+			}
+		}
+
 		public void SetPixel(int x, int y, int color)
 		{
+			// Ignore out-of-bounds drawing (simplifies clipping)
 			if (x < 0 || x >= Width)
 			{
-				throw new ArgumentOutOfRangeException(nameof(x));
+				return;
 			}
 
 			if (y < 0 || y >= Height)
 			{
-				throw new ArgumentOutOfRangeException(nameof(y));
+				return;
 			}
 
 			int byteOffset = (y * 25) + (x / 8);
@@ -233,17 +348,17 @@ namespace AutoPilotControl
 
 		public void UpdateScreen()
 		{
-			WaitNotBusy();
+			WaitReady();
 			WriteCommand(0x10);
-			for (int i = 0; i < _bitBuffer.Length; i++)
+			for (int i = 0; i < _bitBuffer.BufferByteCount; i++)
 			{
 				WriteData(_bitBuffer[i]);
 			}
 
 			Thread.Sleep(2);
-			WaitNotBusy();
+			WaitReady();
 			WriteCommand(0x13);
-			for (int i = 0; i < _bitBuffer.Length; i++)
+			for (int i = 0; i < _bitBuffer.BufferByteCount; i++)
 			{
 				WriteData(_bitBuffer[i]);
 			}
@@ -251,7 +366,7 @@ namespace AutoPilotControl
 			Thread.Sleep(2);
 
 			WriteCommand(0x12);
-			WaitNotBusy();
+			WaitReady();
 			Thread.Sleep(10);
 		}
 
