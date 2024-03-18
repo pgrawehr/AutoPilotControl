@@ -7,6 +7,7 @@ using System.Drawing;
 using Iot.Device.EPaper;
 using Iot.Device.EPaper.Fonts;
 using nanoFramework.Hardware.Esp32;
+using nanoFramework.UI;
 
 namespace AutoPilotControl
 {
@@ -15,7 +16,7 @@ namespace AutoPilotControl
 		private const int LED_PIN = 10;
 		private static GpioController s_GpioController;
 		private static Gdew0154M09 s_display;
-		private static Font8x12 s_font;
+		private static IFont s_font;
 
 		public static void Main()
 		{
@@ -45,16 +46,7 @@ namespace AutoPilotControl
 			s_display.Clear(0);
 			s_display.SetInvertMode(true);
 
-			s_font = new Font8x12();
-
-			var buf = s_display.FrameBuffer;
-			// Draw a cross
-			for (int i = 0; i < s_display.Width; i++)
-			{
-				buf.SetPixel(new System.Drawing.Point(i, i), Color.White);
-				buf.SetPixel(new System.Drawing.Point(s_display.Width - i - 1, i), Color.Black);
-			}
-			s_display.UpdateScreen();
+			s_font = new Font12x20();
 
 			DrawStartupPage();
 
@@ -77,8 +69,9 @@ namespace AutoPilotControl
 
 		public static void DrawStartupPage()
 		{
+			s_display.Clear(false);
 			using var gfx = new Graphics(s_display);
-			gfx.DrawText("Hello World!", s_font, 10, 10, Color.White);
+			gfx.DrawTextEx("Hello World!", s_font, 10, 10, Color.White);
 			s_display.UpdateScreen();
 		}
 	}
