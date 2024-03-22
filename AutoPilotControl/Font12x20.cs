@@ -287,11 +287,6 @@ namespace AutoPilotControl
 		{
 			get
 			{
-				if (character < ' ')
-				{
-					character = ' ';
-				}
-
 				return _font_12x20[character];
 			}
 		}

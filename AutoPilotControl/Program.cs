@@ -72,6 +72,12 @@ namespace AutoPilotControl
 			s_display.Clear(false);
 			using var gfx = new Graphics(s_display);
 			gfx.DrawTextEx("Hello World!", s_font, 10, 10, Color.White);
+			string chars = string.Empty;
+			for (char i = '\u0001'; i < 256; i++)
+			{
+				chars = chars + i;
+			}
+			gfx.DrawTextEx(chars, s_font, 0, 25, Color.White);
 			s_display.UpdateScreen();
 		}
 	}

@@ -24,7 +24,7 @@ namespace AutoPilotControl
 
 			foreach (char character in text)
 			{
-				if (col == gfx.EPaperDisplay.Width)
+				if (col >= gfx.EPaperDisplay.Width)
 				{
 					col = 0;
 					line += font.Height + 1;
