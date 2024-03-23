@@ -8,20 +8,19 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectTypeGuids>{11A8DD76-328B-46DF-9F39-F559912D0360};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-    <ProjectGuid>4c889745-aae2-44dd-8650-2104717f0669</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <ProjectGuid>cbf86100-f644-497b-8351-fcc257177b69</ProjectGuid>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <FileAlignment>512</FileAlignment>
-    <RootNamespace>AutoPilotControl</RootNamespace>
-    <AssemblyName>AutoPilotControl</AssemblyName>
+    <RootNamespace>FontLibrary</RootNamespace>
+    <AssemblyName>FontLibrary</AssemblyName>
     <TargetFrameworkVersion>v1.0</TargetFrameworkVersion>
   </PropertyGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.props" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.props')" />
   <ItemGroup>
-    <Compile Include="FixedGraphics.cs" />
-    <Compile Include="Gdew0154M09.cs" />
-    <Compile Include="MenuItems.cs" />
-    <Compile Include="Program.cs" />
+    <Compile Include="Font12x20.cs" />
+    <Compile Include="Font16x26.cs" />
+    <Compile Include="Font8x14.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -32,10 +31,7 @@
       <HintPath>..\packages\nanoFramework.CoreLibrary.1.15.5\lib\mscorlib.dll</HintPath>
     </Reference>
     <Reference Include="nanoFramework.Graphics.Core">
-      <HintPath>..\packages\nanoFramework.Graphics.1.2.4\lib\nanoFramework.Graphics.Core.dll</HintPath>
-    </Reference>
-    <Reference Include="nanoFramework.Hardware.Esp32">
-      <HintPath>..\packages\nanoFramework.Hardware.Esp32.1.6.12\lib\nanoFramework.Hardware.Esp32.dll</HintPath>
+      <HintPath>..\packages\nanoFramework.Graphics.Core.1.2.4\lib\nanoFramework.Graphics.Core.dll</HintPath>
     </Reference>
     <Reference Include="nanoFramework.ResourceManager">
       <HintPath>..\packages\nanoFramework.ResourceManager.1.2.19\lib\nanoFramework.ResourceManager.dll</HintPath>
@@ -61,9 +57,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\FontLibrary\FontLibrary.nfproj" />
   </ItemGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.CSharp.targets')" />
   <ProjectExtensions>

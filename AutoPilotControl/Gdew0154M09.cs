@@ -3,6 +3,7 @@ using System.Device.Gpio;
 using System.Device.Spi;
 using System.Drawing;
 using System.Threading;
+using Iot.Device.EPaper;
 using Iot.Device.EPaper.Buffers;
 using Iot.Device.EPaper.Drivers;
 
@@ -356,6 +357,25 @@ namespace AutoPilotControl
 
 			WriteCommand(0x12);
 			WaitReady();
+		}
+
+		public void InverseFillRectangle(int startX, int startY, int endX, int endY)
+		{
+			for (int currentY = startY; currentY != endY; currentY++)
+			{
+				for (int xx = startX; xx != endX; xx++)
+				{
+					var p = _bitBuffer.GetPixel(new Point(xx, currentY));
+					if (p == Color.White)
+					{
+						_bitBuffer.SetPixel(new Point(xx, currentY), Color.Black);
+					}
+					else
+					{
+						_bitBuffer.SetPixel(new Point(xx, currentY), Color.White);
+					}
+				}
+			}
 		}
 
 		public void Dispose()

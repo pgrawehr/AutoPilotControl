@@ -13,20 +13,12 @@ namespace AutoPilotControl
 {
 	public class Program
 	{
-		private const int LED_PIN = 10;
 		private static GpioController s_GpioController;
 		private static Gdew0154M09 s_display;
-		private static IFont s_font;
 
 		public static void Main()
 		{
 			s_GpioController = new GpioController();
-
-			var led = s_GpioController.OpenPin(LED_PIN, PinMode.Output);
-
-			var topButton = s_GpioController.OpenPin(5, PinMode.Input);
-
-			led.Write(PinValue.Low);
 
 			SpiDevice spiDevice;
 			SpiConnectionSettings connectionSettings;
@@ -46,39 +38,11 @@ namespace AutoPilotControl
 			s_display.Clear(0);
 			s_display.SetInvertMode(true);
 
-			s_font = new Font16x26();
+			MenuItems menu = new MenuItems(s_GpioController, s_display);
+			menu.Run();
 
-			DrawStartupPage();
-
-			while (topButton.Read() == PinValue.High)
-			{
-				led.Toggle();
-				Thread.Sleep(125);
-				led.Toggle();
-				Thread.Sleep(125);
-				led.Toggle();
-				Thread.Sleep(125);
-				led.Toggle();
-				Thread.Sleep(525);
-			}
-
-			led.Write(PinValue.Low);
 			Sleep.EnableWakeupByPin(Sleep.WakeupGpioPin.Pin27, 0);
 			// Sleep.StartDeepSleep(); // Works, but how to get it back alive?
-		}
-
-		public static void DrawStartupPage()
-		{
-			s_display.Clear(false);
-			using var gfx = new Graphics(s_display);
-			gfx.DrawTextEx("Hello World!", s_font, 10, 10, Color.White);
-			string chars = string.Empty;
-			for (char i = '\u0001'; i < 256; i++)
-			{
-				chars = chars + i;
-			}
-			gfx.DrawTextEx(chars, s_font, 0, 25, Color.White);
-			s_display.UpdateScreen();
 		}
 	}
 }
