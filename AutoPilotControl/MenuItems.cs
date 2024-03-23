@@ -77,20 +77,46 @@ namespace AutoPilotControl
 		public void Startup()
 		{
 			_display.Clear(false);
-			_gfx.DrawTextEx("Startup!", _font, 10, 10, Color.White);
+			_gfx.DrawTextEx("Startup!", _font, 0, 0, Color.White);
+			_gfx.DrawLine(0, _font.Height, 200, _font.Height, Color.White);
 
-			_gfx.DrawTextEx("Wifi...", _font, 0, _font.Height + 2, Color.White);
+			int y = _font.Height + 2;
+			_gfx.DrawTextEx("Display.[OK]", _font, 0, y, Color.White);
+
+			y += _font.Height + 2;
+			_gfx.DrawTextEx("Wifi...", _font, 0, y, Color.White);
 			_display.UpdateScreen();
 
-			ConnectToWifi();
+			if (ConnectToWifi())
+			{
+				_gfx.DrawTextEx("Wifi.[OK]", _font, 0, y, Color.White);
+			}
+			else
+			{
+				_gfx.DrawTextEx("Wifi.[FAIL]", _font, 0, y, Color.White);
+			}
+
+			y += _font.Height + 2;
+			_gfx.DrawTextEx("SNTP...", _font, 0, y, Color.White);
+			_display.UpdateScreen();
+
+			Sntp.Server1 = "time.windows.com";
+			Sntp.Start();
+			Sntp.UpdateNow();
+			_gfx.DrawTextEx("SNTP." + (Sntp.IsStarted ? "[OK]" : "[FAIL]"), _font, 0, y, Color.White);
+			_display.UpdateScreen();
+
+			Thread.Sleep(2000);
+
+			ShowClock();
 		}
 
-		private void ConnectToWifi()
+		private bool ConnectToWifi()
 		{
 			// Give 60 seconds to the wifi join to happen
-			CancellationTokenSource cs = new(30000);
+			CancellationTokenSource cs = new(60000);
 			// Use connect here to set up the wifi password for the first time (but DO NOT COMMIT!!!)
-			var success = WifiNetworkHelper.Reconnect(requiresDateTime: true, token: cs.Token);
+			var success = WifiNetworkHelper.Reconnect(requiresDateTime: false, token: cs.Token);
 			if (!success)
 			{
 				// Something went wrong, you can get details with the ConnectionError property:
@@ -99,10 +125,13 @@ namespace AutoPilotControl
 				{
 					Debug.WriteLine($"ex: {WifiNetworkHelper.HelperException}");
 				}
+
+				return false;
 			}
 			else
 			{
 				Debug.WriteLine("Connected to Wifi.");
+				return true;
 			}
 		}
 
