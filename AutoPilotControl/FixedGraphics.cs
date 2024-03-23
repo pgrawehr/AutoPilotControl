@@ -17,7 +17,7 @@ namespace AutoPilotControl
 		/// <param name="x">Starting X point.</param>
 		/// <param name="y">Starting Y point.</param>
 		/// <param name="color">The font color.</param>
-		public static void DrawTextEx(this Graphics gfx, string text, IFont font, int x, int y, Color color)
+		public static void DrawTextEx(this Graphics gfx, string text, IFont2 font, int x, int y, Color color)
 		{
 			var col = 0;
 			var line = 0;
@@ -42,7 +42,7 @@ namespace AutoPilotControl
 						uint b;
 						if (bytesPerChar == 2)
 						{
-							b = BitConverter.ToUInt16(characterBitmap, i * 2);
+							b = (uint)(characterBitmap[i * 2] | characterBitmap[i * 2 + 1] << 8);
 						}
 						else if (bytesPerChar == 3)
 						{
@@ -50,7 +50,7 @@ namespace AutoPilotControl
 						}
 						else
 						{
-							b = BitConverter.ToUInt32(characterBitmap, i * 4);
+							b = (uint)(characterBitmap[i * 4] | characterBitmap[i * 4 + 1] << 8 | characterBitmap[i * 4 + 2] << 16 | characterBitmap[i * 4 + 3] << 24);
 						}
 
 						for (var pixel = 0; pixel < font.Width; pixel++)

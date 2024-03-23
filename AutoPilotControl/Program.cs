@@ -16,7 +16,7 @@ namespace AutoPilotControl
 		private const int LED_PIN = 10;
 		private static GpioController s_GpioController;
 		private static Gdew0154M09 s_display;
-		private static IFont s_font;
+		private static Font16x26 s_font;
 
 		public static void Main()
 		{
