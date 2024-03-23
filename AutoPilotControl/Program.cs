@@ -46,7 +46,7 @@ namespace AutoPilotControl
 			s_display.Clear(0);
 			s_display.SetInvertMode(true);
 
-			s_font = new Font12x20();
+			s_font = new Font16x26();
 
 			DrawStartupPage();
 

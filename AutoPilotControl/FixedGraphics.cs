@@ -21,6 +21,7 @@ namespace AutoPilotControl
 		{
 			var col = 0;
 			var line = 0;
+			int bytesPerChar = (font.Width / 8) + ((font.Width % 8) == 0 ? 0 : 1);
 
 			foreach (char character in text)
 			{
@@ -31,18 +32,26 @@ namespace AutoPilotControl
 				}
 
 				var characterBitmap = font[character];
-				if (font.Width > 16)
-				{
-					throw new NotSupportedException("Font width to big");
-				}
-				if (font.Width > 8)
+				if (bytesPerChar > 1)
 				{
 					for (var i = 0; i < font.Height; i++)
 					{
 						var xPos = x + col;
 						var yPos = y + line + i;
 						var bitMask = 0x01;
-						ushort b = BitConverter.ToUInt16(characterBitmap, i * 2);
+						uint b;
+						if (bytesPerChar == 2)
+						{
+							b = BitConverter.ToUInt16(characterBitmap, i * 2);
+						}
+						else if (bytesPerChar == 3)
+						{
+							b = (uint)(characterBitmap[i * 3] | characterBitmap[i * 3 + 1] << 8 | characterBitmap[i * 3 + 2] << 16); 
+						}
+						else
+						{
+							b = BitConverter.ToUInt32(characterBitmap, i * 4);
+						}
 
 						for (var pixel = 0; pixel < font.Width; pixel++)
 						{
