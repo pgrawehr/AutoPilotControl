@@ -5,6 +5,8 @@ using System.Collections;
 using System.Device.Gpio;
 using System.Drawing;
 using System.Threading;
+using nanoFramework.Networking;
+using System.Diagnostics;
 
 namespace AutoPilotControl
 {
@@ -42,7 +44,7 @@ namespace AutoPilotControl
 			_led.Write(PinValue.High);
 			_font = new Font16x26();
 
-			DrawStartupPage();
+			Startup();
 
 			bool exit = false;
 
@@ -72,11 +74,36 @@ namespace AutoPilotControl
 			_gfx.Dispose();
 		}
 
-		public void DrawStartupPage()
+		public void Startup()
 		{
 			_display.Clear(false);
 			_gfx.DrawTextEx("Startup!", _font, 10, 10, Color.White);
+
+			_gfx.DrawTextEx("Wifi...", _font, 0, _font.Height + 2, Color.White);
 			_display.UpdateScreen();
+
+			ConnectToWifi();
+		}
+
+		private void ConnectToWifi()
+		{
+			// Give 60 seconds to the wifi join to happen
+			CancellationTokenSource cs = new(30000);
+			// Use connect here to set up the wifi password for the first time (but DO NOT COMMIT!!!)
+			var success = WifiNetworkHelper.Reconnect(requiresDateTime: true, token: cs.Token);
+			if (!success)
+			{
+				// Something went wrong, you can get details with the ConnectionError property:
+				Debug.WriteLine($"Can't connect to the network, error: {WifiNetworkHelper.Status}");
+				if (WifiNetworkHelper.HelperException != null)
+				{
+					Debug.WriteLine($"ex: {WifiNetworkHelper.HelperException}");
+				}
+			}
+			else
+			{
+				Debug.WriteLine("Connected to Wifi.");
+			}
 		}
 
 		private void ShowMenu(String title, ArrayList menuOptions)
@@ -137,7 +164,12 @@ namespace AutoPilotControl
 		public void ShowClock()
 		{
 			_display.Clear(false);
-			string time = DateTime.UtcNow.ToString("T");
+			var dt = DateTime.UtcNow;
+			string date = dt.ToString("dddd,");
+			_gfx.DrawTextEx(date, _font, 0, 0, Color.White);
+			date = dt.ToString("dd. MMM yyyy");
+			_gfx.DrawTextEx(date, _font, 0, _font.Height + 2, Color.White);
+			string time = dt.ToString("T");
 			_gfx.DrawTextEx(time, _font, 20, 100 - (_font.Height / 2), Color.White);
 			_display.UpdateScreen();
 			Thread.Sleep(2000);
