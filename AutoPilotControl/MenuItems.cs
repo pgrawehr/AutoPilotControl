@@ -82,27 +82,21 @@ namespace AutoPilotControl
 		private void ShowMenu(String title, ArrayList menuOptions)
 		{
 			int selectedEntry = 0;
+			_display.Clear(false);
+			_gfx.DrawTextEx(title, _font, 0, 10, Color.White);
+			_gfx.DrawLine(0, 36, 200, 36, Color.White);
+			int y = 40;
+			for (int i = 0; i < menuOptions.Count; i++)
+			{
+				MenuEntry menuEntry = (MenuEntry)menuOptions[i];
+				_gfx.DrawTextEx(menuEntry.ToString(), _font, 0, y + 1, Color.White);
+				y += _font.Height + 2;
+			}
+
 			while (true)
 			{
-				_display.Clear(false);
-				_gfx.DrawTextEx(title, _font, 0, 10, Color.White);
-				_gfx.DrawLine(0, 36, 200, 36, Color.White);
-				int y = 40;
-				for (int i = 0; i < menuOptions.Count; i++)
-				{
-					MenuEntry menuEntry = (MenuEntry)menuOptions[i];
-					if (i == selectedEntry)
-					{
-						_gfx.DrawRectangle(0, y, 200, _font.Height + 2, Color.White, true);
-						_gfx.DrawTextEx(menuEntry.ToString(), _font, 0, y + 1, Color.Black);
-					}
-					else
-					{
-						_gfx.DrawTextEx(menuEntry.ToString(), _font, 0, y + 1, Color.White);
-					}
-
-					y += _font.Height + 2;
-				}
+				int yStart = 40 + (_font.Height + 2) * selectedEntry;
+				_display.InverseFillRectangle(0, yStart, 200, yStart + _font.Height + 2);
 
 				_display.UpdateScreen();
 
@@ -112,6 +106,8 @@ namespace AutoPilotControl
 					{
 						if (selectedEntry < menuOptions.Count - 1)
 						{
+							// Inverse again to un-mark the selected entry
+							_display.InverseFillRectangle(0, yStart, 200, yStart + _font.Height + 2);
 							selectedEntry++;
 							break;
 						}
@@ -121,6 +117,8 @@ namespace AutoPilotControl
 					{
 						if (selectedEntry > 0)
 						{
+							// Inverse again to un-mark the selected entry
+							_display.InverseFillRectangle(0, yStart, 200, yStart + _font.Height + 2);
 							selectedEntry--;
 							break;
 						}
