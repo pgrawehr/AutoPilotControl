@@ -359,21 +359,18 @@ namespace AutoPilotControl
 			WaitReady();
 		}
 
+		/// <summary>
+		/// Inverses a block of pixels. startX and endX must be a multiple of 8
+		/// </summary>
 		public void InverseFillRectangle(int startX, int startY, int endX, int endY)
 		{
 			for (int currentY = startY; currentY != endY; currentY++)
 			{
-				for (int xx = startX; xx != endX; xx++)
+				for (int xx = startX / 8; xx != endX / 8; xx++)
 				{
-					var p = _bitBuffer.GetPixel(new Point(xx, currentY));
-					if (p == Color.White)
-					{
-						_bitBuffer.SetPixel(new Point(xx, currentY), Color.Black);
-					}
-					else
-					{
-						_bitBuffer.SetPixel(new Point(xx, currentY), Color.White);
-					}
+					int index = xx + (currentY * 25);
+					int b = _bitBuffer[index];
+					_bitBuffer[index] = (byte)(b ^ 0xff);
 				}
 			}
 		}
