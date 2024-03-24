@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Iot.Device.Nmea0183;
 using Iot.Device.Rtc;
 
 namespace AutoPilotControl
@@ -232,6 +233,7 @@ namespace AutoPilotControl
 			client.Connect(IPAddress.Any, UDP_PORT);
 			byte[] buffer = new byte[1024];
 			bool exit = false;
+			DateTime lastTime = DateTime.UtcNow;
 			while (!exit)
 			{
 				try
@@ -240,7 +242,17 @@ namespace AutoPilotControl
 					if (length > 0 && length < buffer.Length)
 					{
 						string data = Encoding.UTF8.GetString(buffer, 0, length);
-						Debug.WriteLine(data);
+						NmeaError errorCode;
+						TalkerSentence ts = TalkerSentence.FromSentenceString(data, out errorCode);
+						if (errorCode != NmeaError.None)
+						{
+							Debug.WriteLine($"Nmea parser error: {errorCode}");
+						}
+						else
+						{
+							var sentence = ts.TryGetTypedValue(ref lastTime);
+							Debug.WriteLine(sentence.ToReadableContent());
+						}
 					}
 				}
 				catch (SocketException ex) when (ex.ErrorCode == (int)SocketError.TimedOut)
