@@ -37,7 +37,12 @@ namespace AutoPilotControl
 			I2cDevice device = I2cDevice.Create(new I2cConnectionSettings(1, Pcf8563.DefaultI2cAddress));
 			s_rtc = new Pcf8563(device);
 
-			Rtc.SetSystemTime(s_rtc.DateTime);
+			// Reasonable date?
+			if (s_rtc.DateTime.Year >= 2024)
+			{
+				Rtc.SetSystemTime(s_rtc.DateTime);
+			}
+			
 
 			var dt = DateTime.UtcNow;
 			Debug.WriteLine($"Startup Time: {dt.ToString("yyyy/MM/dd HH:mm:ss")}");
@@ -52,7 +57,7 @@ namespace AutoPilotControl
 			s_display.Clear(0);
 			s_display.SetInvertMode(true);
 
-			MenuItems menu = new MenuItems(s_GpioController, s_display);
+			MenuItems menu = new MenuItems(s_GpioController, s_display, s_rtc);
 			menu.Run();
 
 			Sleep.EnableWakeupByPin(Sleep.WakeupGpioPin.Pin27, 0);

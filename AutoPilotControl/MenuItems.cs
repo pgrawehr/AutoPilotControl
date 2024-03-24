@@ -7,14 +7,20 @@ using System.Drawing;
 using System.Threading;
 using nanoFramework.Networking;
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using Iot.Device.Rtc;
 
 namespace AutoPilotControl
 {
 	internal class MenuItems
 	{
 		private const int LED_PIN = 10;
+		private const int UDP_PORT = 10110;
 		private readonly GpioController _controller;
 		private readonly Gdew0154M09 _display;
+		private readonly Pcf8563 _rtc;
 
 		private readonly Graphics _gfx;
 
@@ -23,12 +29,13 @@ namespace AutoPilotControl
 		private GpioPin _down;
 		private GpioPin _enter;
 		private GpioPin _topButton;
-		private Font16x26 _font;
+		private IFont _font;
 
-		public MenuItems(GpioController controller, Gdew0154M09 display)
+		public MenuItems(GpioController controller, Gdew0154M09 display, Pcf8563 rtc)
 		{
 			_controller = controller;
 			_display = display;
+			_rtc = rtc;
 			_gfx = new Graphics(_display);
 			_led = _controller.OpenPin(LED_PIN, PinMode.Output);
 			_led.Write(PinValue.High);
@@ -61,6 +68,8 @@ namespace AutoPilotControl
 			}));
 
 			mainMenu.Add(new MenuEntry("Show Clock", ShowClock));
+
+			mainMenu.Add(new MenuEntry("NMEA Display", HandleUdpNmeaStream));
 
 			mainMenu.Add(new MenuEntry("Exit", () => exit = true));
 
@@ -194,6 +203,11 @@ namespace AutoPilotControl
 		{
 			_display.Clear(false);
 			var dt = DateTime.UtcNow;
+			if (dt.Year >= 2024)
+			{
+				_rtc.DateTime = dt;
+			}
+
 			string date = dt.ToString("dddd,");
 			_gfx.DrawTextEx(date, _font, 0, 0, Color.White);
 			date = dt.ToString("dd. MMM yyyy");
@@ -201,7 +215,44 @@ namespace AutoPilotControl
 			string time = dt.ToString("T");
 			_gfx.DrawTextEx(time, _font, 20, 100 - (_font.Height / 2), Color.White);
 			_display.UpdateScreen();
+
+			if (dt.Year >= 2024)
+			{
+				_rtc.DateTime = dt;
+			}
 			Thread.Sleep(2000);
+		}
+
+		private void HandleUdpNmeaStream()
+		{
+			using var client = new UdpClient(UDP_PORT);
+			IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+			client.Client.ReceiveTimeout = 5000;
+			client.Client.SetSocketOption(SocketOptionLevel.Udp, SocketOptionName.Broadcast, true);
+			client.Connect(IPAddress.Any, UDP_PORT);
+			byte[] buffer = new byte[1024];
+			bool exit = false;
+			while (!exit)
+			{
+				try
+				{
+					int length = client.Receive(buffer, ref remote);
+					if (length > 0 && length < buffer.Length)
+					{
+						string data = Encoding.UTF8.GetString(buffer, 0, length);
+						Debug.WriteLine(data);
+					}
+				}
+				catch (SocketException ex) when (ex.ErrorCode == (int)SocketError.TimedOut)
+				{
+					// Ignore
+				}
+
+				if (_topButton.Read() == PinValue.Low)
+				{
+					exit = true;
+				}
+			}
 		}
 
 		private sealed class MenuEntry

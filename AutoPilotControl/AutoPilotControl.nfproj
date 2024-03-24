@@ -85,6 +85,9 @@
     <Reference Include="System.Net">
       <HintPath>..\packages\nanoFramework.System.Net.1.10.72\lib\System.Net.dll</HintPath>
     </Reference>
+    <Reference Include="System.Net.Sockets.UdpClient">
+      <HintPath>..\packages\nanoFramework.System.Net.Sockets.UdpClient.1.1.61\lib\System.Net.Sockets.UdpClient.dll</HintPath>
+    </Reference>
     <Reference Include="System.Threading">
       <HintPath>..\packages\nanoFramework.System.Threading.1.1.32\lib\System.Threading.dll</HintPath>
     </Reference>
