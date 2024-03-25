@@ -216,8 +216,8 @@ namespace Iot.Device.Nmea0183
             GetDegreesMinutesSeconds(longitude, 2, out var normalizedVal, out var deg, out var min, out var sec);
             string strEastOrWest = withDirection ? GetEastOrWest(normalizedVal) : string.Empty;
 
-            string secString = sec.ToString($"00.{new string('0', digits)}");
-            return ($"{deg:000}{DegreesSymbol} {min:00}{MinutesSymbol} {secString}{SecondsSymbol}{strEastOrWest}");
+            string secString = TalkerSentence.DoubleToString(sec, 2, digits);
+            return ($"{TalkerSentence.DoubleToString(deg, 3, 0)}{DegreesSymbol} {TalkerSentence.DoubleToString(min, 2, 0)}{MinutesSymbol} {secString}{SecondsSymbol}{strEastOrWest}");
         }
 
         private static string GetLatitudeString(double latitude, int digits, bool withDirection)
@@ -225,9 +225,9 @@ namespace Iot.Device.Nmea0183
             GetDegreesMinutesSeconds(latitude, digits, out var normalizedVal, out var deg, out var min, out var sec);
             string strNorthOrSouth = withDirection ? GetNorthOrSouth(normalizedVal) : string.Empty;
 
-            string secString = sec.ToString($"00.{new string('0', digits)}");
+            string secString = TalkerSentence.DoubleToString(sec, 2, digits);
 
-            string strLatRet = ($"{deg:00}{DegreesSymbol} {min:00}{MinutesSymbol} {secString}{SecondsSymbol}{strNorthOrSouth}");
+            string strLatRet = ($"{TalkerSentence.DoubleToString(deg, 2, 0)}{DegreesSymbol} {TalkerSentence.DoubleToString(min, 2, 0)}{MinutesSymbol} {secString}{SecondsSymbol}{strNorthOrSouth}");
             return strLatRet;
         }
 
@@ -359,6 +359,16 @@ namespace Iot.Device.Nmea0183
             var strLonRet = GetLongitudeString(Longitude, 2, true);
 
             return $"{strLatRet} {strLonRet} Ellipsoidal Height {EllipsoidalHeight:F0}m";
+        }
+
+        public string GetLatitudeString()
+        {
+	        return GetLatitudeString(Latitude, 2, true);
+        }
+
+        public string GetLongitudeString()
+        {
+	        return GetLongitudeString(Longitude, 2, true);
         }
 
         /// <summary>

@@ -285,5 +285,26 @@ namespace Iot.Device.Nmea0183
         {
             return new RawSentence(TalkerId, Id, Fields, lastMessageTime);
         }
+
+        /// <summary>
+        /// Replaces double.ToString() with a format argument of e.g. "00.0000" to generate at least two leading digits and at most 4 trailing digits
+        /// after the dot
+        /// </summary>
+        /// <param name="d">The value</param>
+        /// <param name="leadingDigits">Number of digits of whole part</param>
+        /// <param name="trailingDigits">Number of digits of fractional part</param>
+        /// <returns>A string</returns>
+        public static string DoubleToString(double d, int leadingDigits, int trailingDigits)
+        {
+	        string s = d.ToString($"F{trailingDigits}");
+            int idxDot = s.IndexOf('.');
+            if (idxDot >= 0 && idxDot < leadingDigits)
+            {
+                int toAdd = leadingDigits - idxDot;
+                s = new string('0', toAdd) + s;
+            }
+
+            return s;
+        }
     }
 }

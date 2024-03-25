@@ -11,14 +11,16 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Iot.Device.Nmea0183;
+using Iot.Device.Nmea0183.Sentences;
 using Iot.Device.Rtc;
+using UnitsNet;
 
 namespace AutoPilotControl
 {
 	internal class MenuItems
 	{
-		private const int LED_PIN = 10;
 		private const int UDP_PORT = 10110;
+		private const int LED_PIN = 10;
 		private readonly GpioController _controller;
 		private readonly Gdew0154M09 _display;
 		private readonly Pcf8563 _rtc;
@@ -32,6 +34,12 @@ namespace AutoPilotControl
 		private GpioPin _topButton;
 		private IFont _font;
 
+		private bool _nmeaParserRunning;
+
+		private GeographicPosition _position;
+		private double _speedKnots;
+		private Angle _track;
+
 		public MenuItems(GpioController controller, Gdew0154M09 display, Pcf8563 rtc)
 		{
 			_controller = controller;
@@ -44,6 +52,7 @@ namespace AutoPilotControl
 			_enter = _controller.OpenPin(38, PinMode.Input);
 			_down = _controller.OpenPin(39, PinMode.Input);
 			_topButton = _controller.OpenPin(5, PinMode.Input);
+			_position = new GeographicPosition();
 		}
 
 		public void Run()
@@ -70,7 +79,7 @@ namespace AutoPilotControl
 
 			mainMenu.Add(new MenuEntry("Show Clock", ShowClock));
 
-			mainMenu.Add(new MenuEntry("NMEA Display", HandleUdpNmeaStream));
+			mainMenu.Add(new MenuEntry("NMEA Display", ShowNmeaData));
 
 			mainMenu.Add(new MenuEntry("Exit", () => exit = true));
 
@@ -224,47 +233,72 @@ namespace AutoPilotControl
 			Thread.Sleep(2000);
 		}
 
-		private void HandleUdpNmeaStream()
+		private void OnBackButtonClicked(object sender, PinValueChangedEventArgs e)
 		{
-			using var client = new UdpClient(UDP_PORT);
-			IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-			client.Client.ReceiveTimeout = 5000;
-			client.Client.SetSocketOption(SocketOptionLevel.Udp, SocketOptionName.Broadcast, true);
-			client.Connect(IPAddress.Any, UDP_PORT);
-			byte[] buffer = new byte[1024];
-			bool exit = false;
-			DateTime lastTime = DateTime.UtcNow;
-			while (!exit)
-			{
-				try
-				{
-					int length = client.Receive(buffer, ref remote);
-					if (length > 0 && length < buffer.Length)
-					{
-						string data = Encoding.UTF8.GetString(buffer, 0, length);
-						NmeaError errorCode;
-						TalkerSentence ts = TalkerSentence.FromSentenceString(data, out errorCode);
-						if (errorCode != NmeaError.None)
-						{
-							Debug.WriteLine($"Nmea parser error: {errorCode}");
-						}
-						else
-						{
-							var sentence = ts.TryGetTypedValue(ref lastTime);
-							Debug.WriteLine(sentence.ToReadableContent());
-						}
-					}
-				}
-				catch (SocketException ex) when (ex.ErrorCode == (int)SocketError.TimedOut)
-				{
-					// Ignore
-				}
+			_nmeaParserRunning = false;
+		}
 
-				if (_topButton.Read() == PinValue.Low)
+		private void OnNewMessage(NmeaSentence sentence)
+		{
+			if (sentence is RecommendedMinimumNavigationInformation rmc)
+			{
+				_position = rmc.Position;
+				_speedKnots = RecommendedMinimumNavigationInformation.MetersPerSecondToKnots(rmc.SpeedOverGround);
+				_track = rmc.TrackMadeGoodInDegreesTrue;
+			}
+		}
+
+		public void ShowNmeaData()
+		{
+			_nmeaParserRunning = true;
+			NmeaParser ps = new NmeaParser(UDP_PORT);
+			ps.NewMessage += OnNewMessage;
+			try
+			{
+				ps.StartDecode();
+				_controller.RegisterCallbackForPinValueChangedEvent(_topButton.PinNumber, PinEventTypes.Falling, OnBackButtonClicked);
+				bool hadData = true; // flag to avoid constantly redrawing the no-data symbol, which is expensive
+				while (_nmeaParserRunning)
 				{
-					exit = true;
+					_display.Clear(false);
+					if (ps.IsReceivingData)
+					{
+						int y = 0;
+						_gfx.DrawTextEx(_position.GetLatitudeString(), _font, 0, y, Color.White);
+						y += _font.Height + 2;
+						_gfx.DrawTextEx(_position.GetLongitudeString(), _font, 0, y, Color.White);
+						y += _font.Height + 2;
+						_gfx.DrawTextEx("Speed " + _speedKnots.ToString("F2") + "kts", _font, 0, y, Color.White);
+						y += _font.Height + 2;
+						_gfx.DrawTextEx("Track " + _track.Degrees.ToString("F2") + "°", _font, 0, y, Color.White);
+						hadData = true;
+
+						_display.UpdateScreen();
+					}
+					else if (hadData)
+					{
+						_gfx.DrawTextEx("No data", _font, 0, 0, Color.White);
+						_gfx.DrawCircle(100, 100, 70, Color.White, true);
+						_gfx.DrawRectangle(40, 90, 120, 20, Color.Black, true);
+						hadData = false;
+
+						_display.UpdateScreen();
+					}
+
+					Thread.Sleep(100);
 				}
 			}
+			finally
+			{
+				_controller.UnregisterCallbackForPinValueChangedEvent(_topButton.PinNumber, OnBackButtonClicked);
+				ps.StopDecode();
+				ps.Dispose();
+			}
+		}
+
+		private void Ps_NewMessage(NmeaSentence sentence)
+		{
+			throw new NotImplementedException();
 		}
 
 		private sealed class MenuEntry

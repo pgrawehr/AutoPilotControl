@@ -82,12 +82,12 @@ namespace Iot.Device.Nmea0183.Sentences
         /// </remarks>
         public NavigationStatus Status2 { get; private set; }
 
-        public double MetersPerSecondToKnots(double ms)
+        public static double MetersPerSecondToKnots(double ms)
         {
 	        return ms * 1.944012;
         }
 
-        public double KnotsToMetersPerSecond(double knots)
+        public static double KnotsToMetersPerSecond(double knots)
         {
 	        return knots / 1.944012;
         }
@@ -104,10 +104,10 @@ namespace Iot.Device.Nmea0183.Sentences
             double degrees;
             CardinalDirection direction;
             DegreesToNmea0183(Position.Latitude, true, out degrees, out direction);
-            b.Append($"{degrees:0000.00000},{(char)direction},");
+            b.Append($"{TalkerSentence.DoubleToString(degrees, 4, 5)},{(char)direction},");
             
             DegreesToNmea0183(Position.Longitude, false, out degrees, out direction);
-            b.Append($"{degrees:0000.00000},{(char)direction},");
+            b.Append($"{TalkerSentence.DoubleToString(degrees, 4, 5)},{(char)direction},");
 
             string speed = MetersPerSecondToKnots(SpeedOverGround).ToString("0.000");
             b.Append($"{speed},");
@@ -249,7 +249,7 @@ namespace Iot.Device.Nmea0183.Sentences
         {
             if (Valid)
             {
-                return $"Position: {Position} / Speed {SpeedOverGround} / Track {TrackMadeGoodInDegreesTrue}";
+                return $"Position: {Position} / Speed {SpeedOverGround}m/s / Track {TrackMadeGoodInDegreesTrue.Degrees}°";
             }
 
             return "Position unknown";

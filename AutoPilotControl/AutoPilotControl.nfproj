@@ -25,8 +25,6 @@
     <Compile Include="Nmea0183\GeographicPositionExtensions.cs" />
     <Compile Include="Nmea0183\MissingMath.cs" />
     <Compile Include="Nmea0183\NmeaError.cs" />
-    <Compile Include="Nmea0183\NmeaParser.cs" />
-    <Compile Include="Nmea0183\NmeaSinkAndSource.cs" />
     <Compile Include="Nmea0183\SentenceId.cs" />
     <Compile Include="Nmea0183\Sentences\CardinalDirection.cs" />
     <Compile Include="Nmea0183\Sentences\NavigationStatus.cs" />
@@ -35,6 +33,7 @@
     <Compile Include="Nmea0183\Sentences\RecommendedMinimumNavigationInformation.cs" />
     <Compile Include="Nmea0183\TalkerId.cs" />
     <Compile Include="Nmea0183\TalkerSentence.cs" />
+    <Compile Include="NmeaParser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
