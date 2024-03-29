@@ -88,5 +88,22 @@ namespace AutoPilotControl
 				col += font.Width;
 			}
 		}
+
+		/// <summary>
+		/// Measures the size of a text string on the screen, assuming it fits on a single line
+		/// </summary>
+		/// <param name="gfx">The graphics object</param>
+		/// <param name="text">The text to measure</param>
+		/// <param name="font">The font to use</param>
+		/// <param name="lineSpacing">Used line spacing, in pixels</param>
+		/// <param name="padRight">Padding on the right side</param>
+		/// <returns>The size of the text, in pixels</returns>
+		public static Size MeasureString(this Graphics gfx, string text, IFont font, int lineSpacing, int padRight)
+		{
+			int width = (text.Length * font.Width) + padRight;
+			int height = font.Height;
+
+			return new Size(width, height + lineSpacing);
+		}
 	}
 }

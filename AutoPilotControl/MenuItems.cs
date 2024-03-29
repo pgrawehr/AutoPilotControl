@@ -32,7 +32,8 @@ namespace AutoPilotControl
 		private GpioPin _down;
 		private GpioPin _enter;
 		private GpioPin _topButton;
-		private IFont _font;
+		private IFont _bigFont;
+		private IFont _mediumFont;
 
 		private bool _nmeaParserRunning;
 
@@ -53,13 +54,15 @@ namespace AutoPilotControl
 			_down = _controller.OpenPin(39, PinMode.Input);
 			_topButton = _controller.OpenPin(5, PinMode.Input);
 			_position = new GeographicPosition();
+
+			_bigFont = new Font16x26Reduced();
+			_mediumFont = _bigFont;
 		}
 
 		public void Run()
 		{
 			// Led should be high in idle state
 			_led.Write(PinValue.High);
-			_font = new Font16x26();
 
 			Startup();
 
@@ -96,33 +99,33 @@ namespace AutoPilotControl
 		public void Startup()
 		{
 			_display.Clear(false);
-			_gfx.DrawTextEx("Startup!", _font, 0, 0, Color.White);
-			_gfx.DrawLine(0, _font.Height, 200, _font.Height, Color.White);
+			_gfx.DrawTextEx("Startup!", _bigFont, 0, 0, Color.White);
+			_gfx.DrawLine(0, _bigFont.Height, 200, _bigFont.Height, Color.White);
 
-			int y = _font.Height + 2;
-			_gfx.DrawTextEx("Display.[OK]", _font, 0, y, Color.White);
+			int y = _bigFont.Height + 2;
+			_gfx.DrawTextEx("Display.[OK]", _bigFont, 0, y, Color.White);
 
-			y += _font.Height + 2;
-			_gfx.DrawTextEx("Wifi...", _font, 0, y, Color.White);
+			y += _bigFont.Height + 2;
+			_gfx.DrawTextEx("Wifi...", _bigFont, 0, y, Color.White);
 			_display.UpdateScreen();
 
 			if (ConnectToWifi())
 			{
-				_gfx.DrawTextEx("Wifi.[OK]", _font, 0, y, Color.White);
+				_gfx.DrawTextEx("Wifi.[OK]", _bigFont, 0, y, Color.White);
 			}
 			else
 			{
-				_gfx.DrawTextEx("Wifi.[FAIL]", _font, 0, y, Color.White);
+				_gfx.DrawTextEx("Wifi.[FAIL]", _bigFont, 0, y, Color.White);
 			}
 
-			y += _font.Height + 2;
-			_gfx.DrawTextEx("SNTP...", _font, 0, y, Color.White);
+			y += _bigFont.Height + 2;
+			_gfx.DrawTextEx("SNTP...", _bigFont, 0, y, Color.White);
 			_display.UpdateScreen();
 
 			Sntp.Server1 = "time.windows.com";
 			Sntp.Start();
 			Sntp.UpdateNow();
-			_gfx.DrawTextEx("SNTP." + (Sntp.IsStarted ? "[OK]" : "[FAIL]"), _font, 0, y, Color.White);
+			_gfx.DrawTextEx("SNTP." + (Sntp.IsStarted ? "[OK]" : "[FAIL]"), _bigFont, 0, y, Color.White);
 			_display.UpdateScreen();
 
 			Thread.Sleep(2000);
@@ -158,20 +161,20 @@ namespace AutoPilotControl
 		{
 			int selectedEntry = 0;
 			_display.Clear(false);
-			_gfx.DrawTextEx(title, _font, 0, 10, Color.White);
+			_gfx.DrawTextEx(title, _bigFont, 0, 10, Color.White);
 			_gfx.DrawLine(0, 36, 200, 36, Color.White);
 			int y = 40;
 			for (int i = 0; i < menuOptions.Count; i++)
 			{
 				MenuEntry menuEntry = (MenuEntry)menuOptions[i];
-				_gfx.DrawTextEx(menuEntry.ToString(), _font, 0, y + 1, Color.White);
-				y += _font.Height + 2;
+				_gfx.DrawTextEx(menuEntry.ToString(), _bigFont, 0, y + 1, Color.White);
+				y += _bigFont.Height + 2;
 			}
 
 			while (true)
 			{
-				int yStart = 40 + (_font.Height + 2) * selectedEntry;
-				_display.InverseFillRectangle(0, yStart, 200, yStart + _font.Height + 2);
+				int yStart = 40 + (_bigFont.Height + 2) * selectedEntry;
+				_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
 
 				_display.UpdateScreen();
 
@@ -182,7 +185,7 @@ namespace AutoPilotControl
 						if (selectedEntry < menuOptions.Count - 1)
 						{
 							// Inverse again to un-mark the selected entry
-							_display.InverseFillRectangle(0, yStart, 200, yStart + _font.Height + 2);
+							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
 							selectedEntry++;
 							break;
 						}
@@ -193,7 +196,7 @@ namespace AutoPilotControl
 						if (selectedEntry > 0)
 						{
 							// Inverse again to un-mark the selected entry
-							_display.InverseFillRectangle(0, yStart, 200, yStart + _font.Height + 2);
+							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
 							selectedEntry--;
 							break;
 						}
@@ -219,11 +222,11 @@ namespace AutoPilotControl
 			}
 
 			string date = dt.ToString("dddd,");
-			_gfx.DrawTextEx(date, _font, 0, 0, Color.White);
+			_gfx.DrawTextEx(date, _bigFont, 0, 0, Color.White);
 			date = dt.ToString("dd. MMM yyyy");
-			_gfx.DrawTextEx(date, _font, 0, _font.Height + 2, Color.White);
+			_gfx.DrawTextEx(date, _bigFont, 0, _bigFont.Height + 2, Color.White);
 			string time = dt.ToString("T");
-			_gfx.DrawTextEx(time, _font, 20, 100 - (_font.Height / 2), Color.White);
+			_gfx.DrawTextEx(time, _bigFont, 20, 100 - (_bigFont.Height / 2), Color.White);
 			_display.UpdateScreen();
 
 			if (dt.Year >= 2024)
@@ -264,20 +267,17 @@ namespace AutoPilotControl
 					if (ps.IsReceivingData)
 					{
 						int y = 0;
-						_gfx.DrawTextEx(_position.GetLatitudeString(), _font, 0, y, Color.White);
-						y += _font.Height + 2;
-						_gfx.DrawTextEx(_position.GetLongitudeString(), _font, 0, y, Color.White);
-						y += _font.Height + 2;
-						_gfx.DrawTextEx("Speed " + _speedKnots.ToString("F2") + "kts", _font, 0, y, Color.White);
-						y += _font.Height + 2;
-						_gfx.DrawTextEx("Track " + _track.Degrees.ToString("F2") + "°", _font, 0, y, Color.White);
+						ValueBlock("Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
+						ValueBlock("Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
+						ValueBlock("SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
+						ValueBlock("TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
 						hadData = true;
 
 						_display.UpdateScreen();
 					}
 					else if (hadData)
 					{
-						_gfx.DrawTextEx("No data", _font, 0, 0, Color.White);
+						_gfx.DrawTextEx("No data", _bigFont, 0, 0, Color.White);
 						_gfx.DrawCircle(100, 100, 70, Color.White, true);
 						_gfx.DrawRectangle(40, 90, 120, 20, Color.Black, true);
 						hadData = false;
@@ -296,9 +296,32 @@ namespace AutoPilotControl
 			}
 		}
 
-		private void Ps_NewMessage(NmeaSentence sentence)
+		private void ValueBlock(string label, string value, string unit, ref int y, Color color)
 		{
-			throw new NotImplementedException();
+			Size labelSize = _gfx.MeasureString(label, _mediumFont, 2, 4);
+			Size valueSize = _gfx.MeasureString(value, _bigFont, 2, 4);
+			Size unitSize = _gfx.MeasureString(unit, _mediumFont, 0, 0);
+			int maxHeight = Math.Max(labelSize.Height, valueSize.Height);
+			int offset = maxHeight - unitSize.Height;
+
+			if (labelSize.Width + valueSize.Width + unitSize.Width <= _display.Width)
+			{
+				// Everything fits on one line
+				_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
+				_gfx.DrawTextEx(value, _bigFont, labelSize.Width, y, color);
+				_gfx.DrawTextEx(unit, _mediumFont, labelSize.Width + valueSize.Width, y + offset, color);
+				y += maxHeight;
+			}
+			else
+			{
+				_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
+				y += labelSize.Height;
+				_gfx.DrawTextEx(value, _bigFont, 0, y, color);
+				_gfx.DrawTextEx(unit, _mediumFont, valueSize.Width, y + offset, color);
+				y += valueSize.Height;
+			}
+
+			_gfx.DrawLine(0, y - 1, _display.Width, y - 1, color);
 		}
 
 		private sealed class MenuEntry

@@ -18,7 +18,9 @@
   </PropertyGroup>
   <Import Project="$(NanoFrameworkProjectSystemPath)NFProjectSystem.props" Condition="Exists('$(NanoFrameworkProjectSystemPath)NFProjectSystem.props')" />
   <ItemGroup>
+    <Compile Include="Font12x20Reduced.cs" />
     <Compile Include="Font12x20.cs" />
+    <Compile Include="Font16x26Reduced.cs" />
     <Compile Include="Font16x26.cs" />
     <Compile Include="Font8x14.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

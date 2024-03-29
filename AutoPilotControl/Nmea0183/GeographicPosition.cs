@@ -217,7 +217,7 @@ namespace Iot.Device.Nmea0183
             string strEastOrWest = withDirection ? GetEastOrWest(normalizedVal) : string.Empty;
 
             string secString = TalkerSentence.DoubleToString(sec, 2, digits);
-            return ($"{TalkerSentence.DoubleToString(deg, 3, 0)}{DegreesSymbol} {TalkerSentence.DoubleToString(min, 2, 0)}{MinutesSymbol} {secString}{SecondsSymbol}{strEastOrWest}");
+            return ($"{TalkerSentence.DoubleToString(deg, 3, 0)}{DegreesSymbol}{TalkerSentence.DoubleToString(min, 2, 0)}{MinutesSymbol}{secString}{SecondsSymbol}{strEastOrWest}");
         }
 
         private static string GetLatitudeString(double latitude, int digits, bool withDirection)
@@ -227,7 +227,7 @@ namespace Iot.Device.Nmea0183
 
             string secString = TalkerSentence.DoubleToString(sec, 2, digits);
 
-            string strLatRet = ($"{TalkerSentence.DoubleToString(deg, 2, 0)}{DegreesSymbol} {TalkerSentence.DoubleToString(min, 2, 0)}{MinutesSymbol} {secString}{SecondsSymbol}{strNorthOrSouth}");
+            string strLatRet = ($"{TalkerSentence.DoubleToString(deg, 2, 0)}{DegreesSymbol}{TalkerSentence.DoubleToString(min, 2, 0)}{MinutesSymbol}{secString}{SecondsSymbol}{strNorthOrSouth}");
             return strLatRet;
         }
 
@@ -363,12 +363,12 @@ namespace Iot.Device.Nmea0183
 
         public string GetLatitudeString()
         {
-	        return GetLatitudeString(Latitude, 2, true);
+	        return GetLatitudeString(Latitude, 1, true);
         }
 
         public string GetLongitudeString()
         {
-	        return GetLongitudeString(Longitude, 2, true);
+	        return GetLongitudeString(Longitude, 1, true);
         }
 
         /// <summary>
