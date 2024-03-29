@@ -249,6 +249,16 @@ namespace Iot.Device.Nmea0183
 		        return new RecommendedMinimumNavigationInformation(this, dateTime);
 	        }
 
+	        if (Id == RecommendedMinimumNavToDestination.Id)
+	        {
+		        return new RecommendedMinimumNavToDestination(this, dateTime);
+	        }
+
+	        if (Id == CrossTrackError.Id)
+	        {
+		        return new CrossTrackError(this, dateTime);
+	        }
+
 	        return null;
         }
 

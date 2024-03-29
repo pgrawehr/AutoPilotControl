@@ -27,10 +27,12 @@
     <Compile Include="Nmea0183\NmeaError.cs" />
     <Compile Include="Nmea0183\SentenceId.cs" />
     <Compile Include="Nmea0183\Sentences\CardinalDirection.cs" />
+    <Compile Include="Nmea0183\Sentences\CrossTrackError.cs" />
     <Compile Include="Nmea0183\Sentences\NavigationStatus.cs" />
     <Compile Include="Nmea0183\Sentences\NmeaSentence.cs" />
     <Compile Include="Nmea0183\Sentences\RawSentence.cs" />
     <Compile Include="Nmea0183\Sentences\RecommendedMinimumNavigationInformation.cs" />
+    <Compile Include="Nmea0183\Sentences\RecommendedMinimumNavToDestination.cs" />
     <Compile Include="Nmea0183\TalkerId.cs" />
     <Compile Include="Nmea0183\TalkerSentence.cs" />
     <Compile Include="NmeaParser.cs" />
@@ -112,6 +114,9 @@
     </Reference>
     <Reference Include="UnitsNet.Angle">
       <HintPath>..\packages\UnitsNet.nanoFramework.Angle.5.49.0\lib\UnitsNet.Angle.dll</HintPath>
+    </Reference>
+    <Reference Include="UnitsNet.Length">
+      <HintPath>..\packages\UnitsNet.nanoFramework.Length.5.49.0\lib\UnitsNet.Length.dll</HintPath>
     </Reference>
     <Reference Include="UnitsNet.Temperature">
       <HintPath>..\packages\UnitsNet.nanoFramework.Temperature.5.49.0\lib\UnitsNet.Temperature.dll</HintPath>

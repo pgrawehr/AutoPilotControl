@@ -43,7 +43,12 @@ namespace AutoPilotControl
 
 		private GeographicPosition _position;
 		private double _speedKnots;
-		private Angle _track;
+		private Angle _track = Angle.Zero;
+		private double _vmgKnots;
+		private Angle _bearingToWaypoint = Angle.Zero;
+		private Length _distanceToWaypoint = Length.Zero;
+		private Length _crossTrackError = Length.Zero;
+		private string _destinationWp;
 
 		public MenuItems(GpioController controller, Pcf8563 rtc)
 		{
@@ -70,12 +75,15 @@ namespace AutoPilotControl
 			_mediumFont = _bigFont;
 
 			_speaker = PwmChannel.CreateFromPin(2, 1000, 0.5);
+			_speaker.Start(); // To make sure it goes off
+			_speaker.Stop();
+			_destinationWp = string.Empty;
 		}
 
 		public void Beep()
 		{
 			_speaker.Start();
-			Thread.Sleep(100);
+			Thread.Sleep(50);
 			_speaker.Stop();
 		}
 
@@ -113,9 +121,10 @@ namespace AutoPilotControl
 
 			_led.Write(PinValue.Low);
 			_display.Clear(true);
-			_gfx.Dispose();
 
 			_display.PowerOff();
+			
+			_gfx.Dispose(); // Disposes the display!
 		}
 
 		public void Startup()
@@ -264,6 +273,7 @@ namespace AutoPilotControl
 		private void OnBackButtonClicked(object sender, PinValueChangedEventArgs e)
 		{
 			_nmeaParserRunning = false;
+			Beep();
 		}
 
 		private void OnNewMessage(NmeaSentence sentence)
@@ -274,6 +284,19 @@ namespace AutoPilotControl
 				_speedKnots = RecommendedMinimumNavigationInformation.MetersPerSecondToKnots(rmc.SpeedOverGround);
 				_track = rmc.TrackMadeGoodInDegreesTrue;
 			}
+
+			if (sentence is RecommendedMinimumNavToDestination rmb)
+			{
+				_vmgKnots = RecommendedMinimumNavigationInformation.MetersPerSecondToKnots(rmb.ApproachSpeed);
+				_bearingToWaypoint = rmb.BearingToWayPoint;
+				_distanceToWaypoint = rmb.DistanceToWayPoint;
+				_destinationWp = rmb.NextWayPointName;
+			}
+
+			if (sentence is CrossTrackError xte)
+			{
+				_crossTrackError = xte.Distance;
+			}
 		}
 
 		public void ShowNmeaData()
@@ -281,10 +304,36 @@ namespace AutoPilotControl
 			_nmeaParserRunning = true;
 			NmeaParser ps = new NmeaParser(UDP_PORT);
 			ps.NewMessage += OnNewMessage;
+
+			const int numPages = 2;
+			int page = 0;
+
+			void OnUpButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
+			{
+				if (page > 0)
+				{
+					page--;
+				}
+				else
+				{
+					page = numPages - 1;
+				}
+
+				Beep();
+			}
+
+			void OnDownButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
+			{
+				page = (page + 1) % numPages;
+				Beep();
+			}
+
 			try
 			{
 				ps.StartDecode();
 				_controller.RegisterCallbackForPinValueChangedEvent(_topButton.PinNumber, PinEventTypes.Falling, OnBackButtonClicked);
+				_controller.RegisterCallbackForPinValueChangedEvent(_up.PinNumber, PinEventTypes.Falling, OnUpButtonClicked);
+				_controller.RegisterCallbackForPinValueChangedEvent(_down.PinNumber, PinEventTypes.Falling, OnDownButtonClicked);
 				bool hadData = true; // flag to avoid constantly redrawing the no-data symbol, which is expensive
 				while (_nmeaParserRunning)
 				{
@@ -292,10 +341,22 @@ namespace AutoPilotControl
 					if (ps.IsReceivingData)
 					{
 						int y = 0;
-						ValueBlock("Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
-						ValueBlock("Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
-						ValueBlock("SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
-						ValueBlock("TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+						if (page == 0)
+						{
+							ValueBlock("Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
+							ValueBlock("Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
+							ValueBlock("SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
+							ValueBlock("TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+						}
+						else if (page == 1)
+						{
+							ValueBlock("WPT", _destinationWp, string.Empty, ref y, Color.White);
+							ValueBlock("DST to WP", _distanceToWaypoint.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
+							ValueBlock("VMG", _vmgKnots.ToString("F2"), "kts", ref y, Color.White);
+							ValueBlock("BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+							ValueBlock("XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
+						}
+
 						hadData = true;
 
 						_display.UpdateScreen();
@@ -316,6 +377,8 @@ namespace AutoPilotControl
 			finally
 			{
 				_controller.UnregisterCallbackForPinValueChangedEvent(_topButton.PinNumber, OnBackButtonClicked);
+				_controller.UnregisterCallbackForPinValueChangedEvent(_up.PinNumber, OnUpButtonClicked);
+				_controller.UnregisterCallbackForPinValueChangedEvent(_down.PinNumber, OnDownButtonClicked);
 				ps.StopDecode();
 				ps.Dispose();
 			}
