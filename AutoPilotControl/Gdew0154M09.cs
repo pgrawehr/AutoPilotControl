@@ -228,6 +228,16 @@ namespace AutoPilotControl
 			}
 		}
 
+		public void PowerOn()
+		{
+			WriteCommandSequence(0x04);
+		}
+
+		public void PowerOff()
+		{
+			WriteCommandSequence(0x02);
+		}
+
 		public void WriteCommandSequence(byte cmd, params byte[] data)
 		{
 			WaitReady();

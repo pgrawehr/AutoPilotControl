@@ -3,6 +3,7 @@ using nanoFramework.UI;
 using System;
 using System.Collections;
 using System.Device.Gpio;
+using System.Device.Pwm;
 using System.Drawing;
 using System.Threading;
 using nanoFramework.Networking;
@@ -14,6 +15,7 @@ using Iot.Device.Nmea0183;
 using Iot.Device.Nmea0183.Sentences;
 using Iot.Device.Rtc;
 using UnitsNet;
+using System.Device.Spi;
 
 namespace AutoPilotControl
 {
@@ -26,6 +28,8 @@ namespace AutoPilotControl
 		private readonly Pcf8563 _rtc;
 
 		private readonly Graphics _gfx;
+
+		private PwmChannel _speaker;
 
 		private GpioPin _led;
 		private GpioPin _up;
@@ -41,11 +45,18 @@ namespace AutoPilotControl
 		private double _speedKnots;
 		private Angle _track;
 
-		public MenuItems(GpioController controller, Gdew0154M09 display, Pcf8563 rtc)
+		public MenuItems(GpioController controller, Pcf8563 rtc)
 		{
 			_controller = controller;
-			_display = display;
 			_rtc = rtc;
+
+			var connectionSettings = new SpiConnectionSettings(1, -1);
+
+			var spiDevice = SpiDevice.Create(connectionSettings);
+			_display = new Gdew0154M09(0, 15, 4, spiDevice, 9, _controller, false);
+			_display.Clear(0);
+			_display.SetInvertMode(true);
+
 			_gfx = new Graphics(_display);
 			_led = _controller.OpenPin(LED_PIN, PinMode.Output);
 			_led.Write(PinValue.High);
@@ -57,6 +68,15 @@ namespace AutoPilotControl
 
 			_bigFont = new Font16x26Reduced();
 			_mediumFont = _bigFont;
+
+			_speaker = PwmChannel.CreateFromPin(2, 1000, 0.5);
+		}
+
+		public void Beep()
+		{
+			_speaker.Start();
+			Thread.Sleep(100);
+			_speaker.Stop();
 		}
 
 		public void Run()
@@ -94,6 +114,8 @@ namespace AutoPilotControl
 			_led.Write(PinValue.Low);
 			_display.Clear(true);
 			_gfx.Dispose();
+
+			_display.PowerOff();
 		}
 
 		public void Startup()
@@ -182,6 +204,7 @@ namespace AutoPilotControl
 				{
 					if (_down.Read() == PinValue.Low)
 					{
+						Beep();
 						if (selectedEntry < menuOptions.Count - 1)
 						{
 							// Inverse again to un-mark the selected entry
@@ -193,6 +216,7 @@ namespace AutoPilotControl
 
 					if (_up.Read() == PinValue.Low)
 					{
+						Beep();
 						if (selectedEntry > 0)
 						{
 							// Inverse again to un-mark the selected entry
@@ -204,6 +228,7 @@ namespace AutoPilotControl
 
 					if (_enter.Read() == PinValue.Low)
 					{
+						Beep();
 						MenuEntry menuEntry = (MenuEntry)menuOptions[selectedEntry];
 						menuEntry.Execute();
 						return;

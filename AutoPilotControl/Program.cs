@@ -17,15 +17,12 @@ namespace AutoPilotControl
 	public class Program
 	{
 		private static GpioController s_GpioController;
-		private static Gdew0154M09 s_display;
 		private static Pcf8563 s_rtc;
 
 		public static void Main()
 		{
 			s_GpioController = new GpioController();
 
-			SpiDevice spiDevice;
-			SpiConnectionSettings connectionSettings;
 			// You can get the values of SpiBus
 			SpiBusInfo spiBusInfo = SpiDevice.GetBusInfo(1);
 			Debug.WriteLine($"{nameof(spiBusInfo.MaxClockFrequency)}: {spiBusInfo.MaxClockFrequency}");
@@ -34,6 +31,11 @@ namespace AutoPilotControl
 			Configuration.SetPinFunction(21, DeviceFunction.I2C1_DATA);
 			Configuration.SetPinFunction(22, DeviceFunction.I2C1_CLOCK);
 
+			Configuration.SetPinFunction(2, DeviceFunction.PWM1);
+			Configuration.SetPinFunction(18, DeviceFunction.SPI1_CLOCK);
+			Configuration.SetPinFunction(23, DeviceFunction.SPI1_MOSI);
+			Configuration.SetPinFunction(19, DeviceFunction.SPI1_MISO);
+			
 			I2cDevice device = I2cDevice.Create(new I2cConnectionSettings(1, Pcf8563.DefaultI2cAddress));
 			s_rtc = new Pcf8563(device);
 
@@ -47,17 +49,7 @@ namespace AutoPilotControl
 			var dt = DateTime.UtcNow;
 			Debug.WriteLine($"Startup Time: {dt.ToString("yyyy/MM/dd HH:mm:ss")}");
 
-			Configuration.SetPinFunction(18, DeviceFunction.SPI1_CLOCK);
-			Configuration.SetPinFunction(23, DeviceFunction.SPI1_MOSI);
-			Configuration.SetPinFunction(19, DeviceFunction.SPI1_MISO);
-			connectionSettings = new SpiConnectionSettings(1, -1);
-
-			spiDevice = SpiDevice.Create(connectionSettings);
-			s_display = new Gdew0154M09(0, 15, 4, spiDevice, 9, s_GpioController, false);
-			s_display.Clear(0);
-			s_display.SetInvertMode(true);
-
-			MenuItems menu = new MenuItems(s_GpioController, s_display, s_rtc);
+			MenuItems menu = new MenuItems(s_GpioController, s_rtc);
 			menu.Run();
 
 			Sleep.EnableWakeupByPin(Sleep.WakeupGpioPin.Pin27, 0);
