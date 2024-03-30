@@ -82,9 +82,19 @@ namespace AutoPilotControl
 				try
 				{
 					int length = client.Receive(buffer, ref remote);
-					if (length > 0 && length < buffer.Length)
+					if (length > 2 && length < buffer.Length)
 					{
-						string data = Encoding.UTF8.GetString(buffer, 0, length);
+						string data = null;
+						try
+						{
+							data = Encoding.UTF8.GetString(buffer, 0, length);
+						}
+						catch (Exception x)
+						{
+							Debug.WriteLine("Invalid characters detected");
+							continue;
+						}
+
 						NmeaError errorCode;
 						TalkerSentence ts = TalkerSentence.FromSentenceString(data, out errorCode);
 						if (errorCode != NmeaError.None)
