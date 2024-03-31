@@ -376,11 +376,23 @@ namespace AutoPilotControl
 		{
 			for (int currentY = startY; currentY != endY; currentY++)
 			{
-				for (int xx = startX / 8; xx != endX / 8; xx++)
+				for (int xx = startX / 8; xx < endX / 8; xx++)
 				{
 					int index = xx + (currentY * 25);
 					int b = _bitBuffer[index];
 					_bitBuffer[index] = (byte)(b ^ 0xff);
+				}
+			}
+		}
+
+		public void FastFillRectangle(int startX, int startY, int endX, int endY, byte pattern)
+		{
+			for (int currentY = startY; currentY != endY; currentY++)
+			{
+				for (int xx = startX / 8; xx < endX / 8; xx++)
+				{
+					int index = xx + (currentY * 25);
+					_bitBuffer[index] = pattern;
 				}
 			}
 		}
@@ -390,7 +402,6 @@ namespace AutoPilotControl
 			for (int xx = startX / 8; xx != endX / 8; xx++)
 			{
 				int index = xx + (y * 25);
-				int b = _bitBuffer[index];
 				_bitBuffer[index] = fillPattern;
 			}
 		}

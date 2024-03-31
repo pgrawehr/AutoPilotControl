@@ -318,6 +318,7 @@ namespace AutoPilotControl
 
 			const int numPages = 3;
 			int page = 0;
+			bool fullRefreshPending = true;
 
 			void OnUpButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
 			{
@@ -330,12 +331,14 @@ namespace AutoPilotControl
 					page = numPages - 1;
 				}
 
+				fullRefreshPending = true;
 				Beep();
 			}
 
 			void OnDownButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
 			{
 				page = (page + 1) % numPages;
+				fullRefreshPending = true;
 				Beep();
 			}
 
@@ -348,24 +351,31 @@ namespace AutoPilotControl
 				bool hadData = true; // flag to avoid constantly redrawing the no-data symbol, which is expensive
 				while (_nmeaParserRunning)
 				{
-					_display.Clear(false);
+					bool fullRefresh = false;
+					if (fullRefreshPending)
+					{
+						_display.Clear(false);
+						fullRefresh = true;
+						fullRefreshPending = false;
+					}
+
 					if (ps.IsReceivingData)
 					{
 						int y = 0;
 						if (page == 0)
 						{
-							ValueBlock("Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
-							ValueBlock("Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
-							ValueBlock("SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
-							ValueBlock("TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+							ValueBlock(false, fullRefresh, "Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
+							ValueBlock(false, fullRefresh, "Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
+							ValueBlock(true, fullRefresh, "SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
+							ValueBlock(true, fullRefresh, "TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
 						}
 						else if (page == 1)
 						{
-							ValueBlock("WPT", _destinationWp, string.Empty, ref y, Color.White);
-							ValueBlock("DST to WP", _distanceToWaypoint.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
-							ValueBlock("VMG", _vmgKnots.ToString("F2"), "kts", ref y, Color.White);
-							ValueBlock("BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
-							ValueBlock("XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
+							ValueBlock(true, fullRefresh, "WPT", _destinationWp, string.Empty, ref y, Color.White);
+							ValueBlock(true, fullRefresh, "DST to WP", _distanceToWaypoint.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
+							ValueBlock(true, fullRefresh, "VMG", _vmgKnots.ToString("F2"), "kts", ref y, Color.White);
+							ValueBlock(true, fullRefresh, "BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+							ValueBlock(true, fullRefresh, "XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
 						}
 						else if (page == 2)
 						{
@@ -381,13 +391,14 @@ namespace AutoPilotControl
 							y = 2;
 							Size textSize = _gfx.MeasureString(status, _bigFont, 0, 0);
 							int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
+							_display.FastFillRectangle(0, y, _display.Width, textSize.Height + y, 0);
 							_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
 							y += textSize.Height + 2;
 							_display.DrawHorizontalLine(0, y - 1, 200, 0xff);
-							ValueBlock("AP HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+							ValueBlock(true, fullRefresh, "AP HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
 							if (_autopilotStatus != ' ' && _autopilotStatus != 'M')
 							{
-								ValueBlock("AP DES HDG", _autopilotDesiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+								ValueBlock(false, fullRefresh, "AP DES HDG", _autopilotDesiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
 							}
 						}
 
@@ -418,29 +429,50 @@ namespace AutoPilotControl
 			}
 		}
 
-		private void ValueBlock(string label, string value, string unit, ref int y, Color color)
+		private void ValueBlock(bool singleLine, bool fullRefresh, string label, string value, string unit, ref int y, Color color)
 		{
-			Size labelSize = _gfx.MeasureString(label, _mediumFont, 2, 4);
+			Size labelSize = _gfx.MeasureString(label, _mediumFont, 2, 8);
 			Size valueSize = _gfx.MeasureString(value, _bigFont, 2, 4);
 			Size unitSize = _gfx.MeasureString(unit, _mediumFont, 0, 0);
 			int maxHeight = Math.Max(labelSize.Height, valueSize.Height);
 			int offset = maxHeight - unitSize.Height;
 
-			if (labelSize.Width + valueSize.Width + unitSize.Width <= _display.Width)
+			if (singleLine)
 			{
-				// Everything fits on one line
-				_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
-				_gfx.DrawTextEx(value, _bigFont, labelSize.Width, y, color);
-				_gfx.DrawTextEx(unit, _mediumFont, labelSize.Width + valueSize.Width, y + offset, color);
+				// Everything should fit on one line
+				if (fullRefresh)
+				{
+					_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
+					_gfx.DrawTextEx(value, _bigFont, labelSize.Width, y, color);
+					_gfx.DrawTextEx(unit, _mediumFont, labelSize.Width + valueSize.Width, y + offset, color);
+				}
+				else
+				{
+					_display.FastFillRectangle(labelSize.Width, y, _display.Width, y + valueSize.Height, 0);
+					_gfx.DrawTextEx(value, _bigFont, labelSize.Width, y, color);
+					_gfx.DrawTextEx(unit, _mediumFont, labelSize.Width + valueSize.Width, y + offset, color);
+				}
+
 				y += maxHeight;
 			}
 			else
 			{
-				_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
-				y += labelSize.Height;
-				_gfx.DrawTextEx(value, _bigFont, 0, y, color);
-				_gfx.DrawTextEx(unit, _mediumFont, valueSize.Width, y + offset, color);
-				y += valueSize.Height;
+				if (fullRefresh)
+				{
+					_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
+					y += labelSize.Height;
+					_gfx.DrawTextEx(value, _bigFont, 0, y, color);
+					_gfx.DrawTextEx(unit, _mediumFont, valueSize.Width, y + offset, color);
+					y += valueSize.Height;
+				}
+				else
+				{
+					y += labelSize.Height;
+					_display.FastFillRectangle(0, y, _display.Width, _bigFont.Height + y, 0);
+					_gfx.DrawTextEx(value, _bigFont, 0, y, color);
+					_gfx.DrawTextEx(unit, _mediumFont, valueSize.Width, y + offset, color);
+					y += valueSize.Height;
+				}
 			}
 
 			_display.DrawHorizontalLine(0, y - 1, _display.Width, 0xff);
