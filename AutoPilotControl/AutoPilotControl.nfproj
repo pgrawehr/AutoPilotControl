@@ -28,6 +28,8 @@
     <Compile Include="Nmea0183\SentenceId.cs" />
     <Compile Include="Nmea0183\Sentences\CardinalDirection.cs" />
     <Compile Include="Nmea0183\Sentences\CrossTrackError.cs" />
+    <Compile Include="Nmea0183\Sentences\HeadingAndTrackControl.cs" />
+    <Compile Include="Nmea0183\Sentences\HeadingAndTrackControlStatus.cs" />
     <Compile Include="Nmea0183\Sentences\NavigationStatus.cs" />
     <Compile Include="Nmea0183\Sentences\NmeaSentence.cs" />
     <Compile Include="Nmea0183\Sentences\RawSentence.cs" />

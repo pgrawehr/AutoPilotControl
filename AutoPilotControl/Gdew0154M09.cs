@@ -385,6 +385,16 @@ namespace AutoPilotControl
 			}
 		}
 
+		public void DrawHorizontalLine(int startX, int y, int endX, byte fillPattern)
+		{
+			for (int xx = startX / 8; xx != endX / 8; xx++)
+			{
+				int index = xx + (y * 25);
+				int b = _bitBuffer[index];
+				_bitBuffer[index] = fillPattern;
+			}
+		}
+
 		public void Dispose()
 		{
 			_resetPin?.Dispose();

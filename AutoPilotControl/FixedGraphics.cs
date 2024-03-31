@@ -23,6 +23,9 @@ namespace AutoPilotControl
 			var line = 0;
 			int bytesPerChar = (font.Width / 8) + ((font.Width % 8) == 0 ? 0 : 1);
 
+			int fontHeight = font.Height;
+			int fontWidth = font.Width;
+
 			foreach (char character in text)
 			{
 				if (col >= gfx.EPaperDisplay.Width)
@@ -32,11 +35,13 @@ namespace AutoPilotControl
 				}
 
 				var characterBitmap = font[character];
+
+				var xPos = x + col;
+
 				if (bytesPerChar > 1)
 				{
-					for (var i = 0; i < font.Height; i++)
+					for (var i = 0; i < fontHeight; i++)
 					{
-						var xPos = x + col;
 						var yPos = y + line + i;
 						var bitMask = 0x01;
 						uint b;
@@ -53,9 +58,15 @@ namespace AutoPilotControl
 							b = BitConverter.ToUInt32(characterBitmap, i * 4);
 						}
 
-						for (var pixel = 0; pixel < font.Width; pixel++)
+						if (b == 0)
 						{
-							if ((b & bitMask) > 0)
+							// Empty rows are quite common, so do a shortcut here
+							continue;
+						}
+
+						for (var pixel = 0; pixel < fontWidth; pixel++)
+						{
+							if ((b & bitMask) != 0)
 							{
 								gfx.DrawPixel(xPos + pixel, yPos, color);
 							}
@@ -66,9 +77,8 @@ namespace AutoPilotControl
 				}
 				else
 				{
-					for (var i = 0; i < font.Height; i++)
+					for (var i = 0; i < fontHeight; i++)
 					{
-						var xPos = x + col;
 						var yPos = y + line + i;
 						var bitMask = 0x01;
 						var b = characterBitmap[i];
@@ -85,7 +95,7 @@ namespace AutoPilotControl
 					}
 				}
 
-				col += font.Width;
+				col += fontWidth;
 			}
 		}
 

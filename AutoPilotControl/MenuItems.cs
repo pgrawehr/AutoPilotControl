@@ -49,6 +49,9 @@ namespace AutoPilotControl
 		private Length _distanceToWaypoint = Length.Zero;
 		private Length _crossTrackError = Length.Zero;
 		private string _destinationWp;
+		private Angle _autopilotHeading = Angle.Zero;
+		private char _autopilotStatus = ' ';
+		private Angle _autopilotDesiredHeading = Angle.Zero;
 
 		public MenuItems(GpioController controller, Pcf8563 rtc)
 		{
@@ -64,7 +67,7 @@ namespace AutoPilotControl
 
 			_gfx = new Graphics(_display);
 			_led = _controller.OpenPin(LED_PIN, PinMode.Output);
-			_led.Write(PinValue.High);
+			_led.Write(PinValue.Low);
 			_up = _controller.OpenPin(37, PinMode.Input);
 			_enter = _controller.OpenPin(38, PinMode.Input);
 			_down = _controller.OpenPin(39, PinMode.Input);
@@ -97,6 +100,9 @@ namespace AutoPilotControl
 			bool exit = false;
 
 			var mainMenu = new ArrayList();
+
+			mainMenu.Add(new MenuEntry("NMEA Display", ShowNmeaData));
+
 			mainMenu.Add(new MenuEntry("Blink Led", () =>
 			{
 				for (int i = 0; i < 10; i++)
@@ -110,8 +116,6 @@ namespace AutoPilotControl
 
 			mainMenu.Add(new MenuEntry("Show Clock", ShowClock));
 
-			mainMenu.Add(new MenuEntry("NMEA Display", ShowNmeaData));
-
 			mainMenu.Add(new MenuEntry("Exit", () => exit = true));
 
 			while (!exit)
@@ -119,7 +123,7 @@ namespace AutoPilotControl
 				ShowMenu("Main menu", mainMenu);
 			}
 
-			_led.Write(PinValue.Low);
+			_led.Write(PinValue.High);
 			_display.Clear(true);
 
 			_display.PowerOff();
@@ -297,6 +301,13 @@ namespace AutoPilotControl
 			{
 				_crossTrackError = xte.Distance;
 			}
+
+			if (sentence is HeadingAndTrackControlStatus htd)
+			{
+				_autopilotHeading = htd.ActualHeading;
+				_autopilotStatus = htd.Status.Length >= 1 ? htd.Status[0] : ' ';
+				_autopilotDesiredHeading = htd.DesiredHeading;
+			}
 		}
 
 		public void ShowNmeaData()
@@ -305,7 +316,7 @@ namespace AutoPilotControl
 			NmeaParser ps = new NmeaParser(UDP_PORT);
 			ps.NewMessage += OnNewMessage;
 
-			const int numPages = 2;
+			const int numPages = 3;
 			int page = 0;
 
 			void OnUpButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
@@ -356,6 +367,29 @@ namespace AutoPilotControl
 							ValueBlock("BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
 							ValueBlock("XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
 						}
+						else if (page == 2)
+						{
+							string status = _autopilotStatus switch
+							{
+								'S' => "Auto",
+								'T' => "Track",
+								'M' => "Manual",
+								'W' => "Wind",
+								_ => "Offline",
+							};
+
+							y = 2;
+							Size textSize = _gfx.MeasureString(status, _bigFont, 0, 0);
+							int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
+							_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
+							y += textSize.Height + 2;
+							_display.DrawHorizontalLine(0, y - 1, 200, 0xff);
+							ValueBlock("AP HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+							if (_autopilotStatus != ' ' && _autopilotStatus != 'M')
+							{
+								ValueBlock("AP DES HDG", _autopilotDesiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+							}
+						}
 
 						hadData = true;
 
@@ -371,7 +405,7 @@ namespace AutoPilotControl
 						_display.UpdateScreen();
 					}
 
-					Thread.Sleep(100);
+					// Thread.Sleep(100);
 				}
 			}
 			finally
@@ -409,7 +443,7 @@ namespace AutoPilotControl
 				y += valueSize.Height;
 			}
 
-			_gfx.DrawLine(0, y - 1, _display.Width, y - 1, color);
+			_display.DrawHorizontalLine(0, y - 1, _display.Width, 0xff);
 		}
 
 		private sealed class MenuEntry

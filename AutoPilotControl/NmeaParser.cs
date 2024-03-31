@@ -32,12 +32,6 @@ namespace AutoPilotControl
 			private set;
 		}
 
-		public double Speed
-		{
-			get;
-			private set;
-		}
-
 		public virtual void StartDecode()
 		{
 			m_tokenSource = new CancellationTokenSource();
@@ -89,7 +83,7 @@ namespace AutoPilotControl
 						{
 							data = Encoding.UTF8.GetString(buffer, 0, length);
 						}
-						catch (Exception x)
+						catch (Exception)
 						{
 							Debug.WriteLine("Invalid characters detected");
 							continue;

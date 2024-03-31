@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using Iot.Device.Nmea0183.Sentences;
@@ -121,6 +122,11 @@ namespace Iot.Device.Nmea0183
             {
                 // When the index of the $ is larger than 0 but less than a small amount, try to decode the remainder of the line
                 sentence = sentence.Substring(idx);
+            }
+
+            if (sentence.EndsWith("\r\n"))
+            {
+	            sentence = sentence.Substring(0, sentence.Length - 2);
             }
 
             if (sentence.Length < sentenceHeaderMinLength)
@@ -247,17 +253,25 @@ namespace Iot.Device.Nmea0183
 	        if (Id == RecommendedMinimumNavigationInformation.Id)
 	        {
 		        return new RecommendedMinimumNavigationInformation(this, dateTime);
-	        }
-
-	        if (Id == RecommendedMinimumNavToDestination.Id)
+	        } 
+	        else if (Id == RecommendedMinimumNavToDestination.Id)
 	        {
 		        return new RecommendedMinimumNavToDestination(this, dateTime);
 	        }
-
-	        if (Id == CrossTrackError.Id)
+            else if (Id == CrossTrackError.Id)
 	        {
 		        return new CrossTrackError(this, dateTime);
 	        }
+            else if (Id == HeadingAndTrackControlStatus.Id)
+	        {
+		        return new HeadingAndTrackControlStatus(this, dateTime);
+	        }
+            else
+            {
+#if DEBUG
+                Debug.WriteLine("Unknown message: " + ToString()); // Most message types are currently unsupported
+#endif
+            }
 
 	        return null;
         }
