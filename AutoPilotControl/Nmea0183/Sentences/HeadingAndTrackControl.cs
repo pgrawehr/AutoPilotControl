@@ -50,6 +50,7 @@ namespace Iot.Device.Nmea0183.Sentences
             Valid = true;
             Status = status;
             DesiredHeading = desiredHeading;
+            DesiredHeadingValid = desiredHeading.Degrees >= 0;
             CommandedRudderAngle = commandedRudderAngle;
             HeadingIsTrue = headingIsTrue;
             CommandedRudderDirection = commandedRudderDirection;
@@ -88,7 +89,8 @@ namespace Iot.Device.Nmea0183.Sentences
             OffHeadingLimit = AsAngle(ReadValue(field));
             TurnRadius = AsLength(ReadValue(field));
             RateOfTurn = ReadValue(field);
-            DesiredHeading = AsAngle(ReadValue(field));
+            DesiredHeading = AsAngle(ReadValue(field, out bool valid));
+            DesiredHeadingValid = valid;
             OffTrackLimit = AsLength(ReadValue(field));
             CommandedTrack = AsAngle(ReadValue(field));
             string headingReference = ReadString(field);
@@ -126,6 +128,8 @@ namespace Iot.Device.Nmea0183.Sentences
         /// Heading to steer.
         /// </summary>
         public Angle DesiredHeading { get; private set; }
+
+        public bool DesiredHeadingValid { get; private set; }
 
         /// <summary>
         /// Angle for directly controlling the rudder. Unsigned. (See <see cref="CommandedRudderDirection"/>)
@@ -208,7 +212,15 @@ namespace Iot.Device.Nmea0183.Sentences
                 b.Append(',');
             }
 
-            b.Append(FromAngle(DesiredHeading));
+            if (DesiredHeadingValid)
+            {
+	            b.Append(FromAngle(DesiredHeading));
+            }
+            else
+            {
+	            b.Append(",");
+            }
+
             b.Append(FromLength(OffTrackLimit));
             b.Append(FromAngle(CommandedTrack));
             b.Append(HeadingIsTrue ? "T" : "M");

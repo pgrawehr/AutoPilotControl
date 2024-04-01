@@ -266,12 +266,6 @@ namespace Iot.Device.Nmea0183
 	        {
 		        return new HeadingAndTrackControlStatus(this, dateTime);
 	        }
-            else
-            {
-#if DEBUG
-                Debug.WriteLine("Unknown message: " + ToString()); // Most message types are currently unsupported
-#endif
-            }
 
 	        return null;
         }

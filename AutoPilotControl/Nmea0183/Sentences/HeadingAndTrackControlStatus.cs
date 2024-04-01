@@ -52,6 +52,7 @@ namespace Iot.Device.Nmea0183.Sentences
             Valid = true;
             Status = status;
             DesiredHeading = desiredHeading;
+            DesiredHeadingValid = desiredHeading.Degrees >= 0;
             CommandedRudderAngle = commandedRudderAngle;
             HeadingIsTrue = headingIsTrue;
             CommandedRudderDirection = commandedRudderDirection;
@@ -94,7 +95,8 @@ namespace Iot.Device.Nmea0183.Sentences
             TurnRadius = HeadingAndTrackControl.AsLength(ReadValue(field));
             double turnRate = ReadValue(field);
             RateOfTurn = turnRate;
-            DesiredHeading = HeadingAndTrackControl.AsAngle(ReadValue(field));
+            DesiredHeading = HeadingAndTrackControl.AsAngle(ReadValue(field, out bool valid));
+            DesiredHeadingValid = valid;
             OffTrackLimit = HeadingAndTrackControl.AsLength(ReadValue(field));
             CommandedTrack = HeadingAndTrackControl.AsAngle(ReadValue(field));
             string headingReference = ReadString(field);
@@ -136,6 +138,8 @@ namespace Iot.Device.Nmea0183.Sentences
         /// Heading to steer.
         /// </summary>
         public Angle DesiredHeading { get; private set; }
+
+        public bool DesiredHeadingValid { get; private set; }
 
         /// <summary>
         /// Angle for directly controlling the rudder. Unsigned. (See <see cref="CommandedRudderDirection"/>)
@@ -231,7 +235,15 @@ namespace Iot.Device.Nmea0183.Sentences
             b.Append(HeadingAndTrackControl.FromLength(TurnRadius));
             b.Append(RateOfTurn.ToString("F1") + ",");
 
-            b.Append(HeadingAndTrackControl.FromAngle(DesiredHeading));
+            if (DesiredHeadingValid)
+            {
+	            b.Append(HeadingAndTrackControl.FromAngle(DesiredHeading));
+            }
+            else
+            {
+	            b.Append(",");
+            }
+
             b.Append(HeadingAndTrackControl.FromLength(OffTrackLimit));
             b.Append(HeadingAndTrackControl.FromAngle(CommandedTrack));
             b.Append(HeadingIsTrue ? "T" : "M");

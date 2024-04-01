@@ -17,11 +17,17 @@ namespace AutoPilotControl
 		private CancellationTokenSource m_tokenSource;
 		private Thread m_thread;
 		private int m_udpPort;
+		private UdpClient m_client;
 
 		public NmeaParser(int udpPort)
 		{
 			m_udpPort = udpPort;
 			IsReceivingData = false;
+
+			m_client = new UdpClient(m_udpPort);
+			m_client.Client.ReceiveTimeout = 5000;
+			m_client.Client.SetSocketOption(SocketOptionLevel.Udp, SocketOptionName.Broadcast, true);
+			m_client.Connect(IPAddress.Any, m_udpPort);
 		}
 
 		public event MessageReceivedDelegate NewMessage;
@@ -49,6 +55,8 @@ namespace AutoPilotControl
 			m_tokenSource.Cancel();
 			m_thread?.Join();
 			m_thread = null;
+			m_client?.Dispose();
+			m_client = null;
 		}
 
 		protected virtual void Dispose(bool disposing)
@@ -62,20 +70,23 @@ namespace AutoPilotControl
 			GC.SuppressFinalize(this);
 		}
 
+		public void SendMessage(NmeaSentence sentence)
+		{
+			string msg = sentence.ToNmeaMessage() + "\r\n";
+			byte[] data = Encoding.UTF8.GetBytes(msg);
+			m_client.Send(data);
+		}
+
 		private void HandleUdpNmeaStream()
 		{
-			using var client = new UdpClient(m_udpPort);
-			IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-			client.Client.ReceiveTimeout = 5000;
-			client.Client.SetSocketOption(SocketOptionLevel.Udp, SocketOptionName.Broadcast, true);
-			client.Connect(IPAddress.Any, m_udpPort);
 			byte[] buffer = new byte[1024];
 			DateTime lastTime = DateTime.UtcNow;
 			while (!m_tokenSource.IsCancellationRequested)
 			{
 				try
 				{
-					int length = client.Receive(buffer, ref remote);
+					var remote = new IPEndPoint(IPAddress.Any, 0);
+					int length = m_client.Receive(buffer, ref remote);
 					if (length > 2 && length < buffer.Length)
 					{
 						string data = null;

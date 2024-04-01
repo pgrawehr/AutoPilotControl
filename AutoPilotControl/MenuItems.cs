@@ -39,8 +39,6 @@ namespace AutoPilotControl
 		private IFont _bigFont;
 		private IFont _mediumFont;
 
-		private bool _nmeaParserRunning;
-
 		private GeographicPosition _position;
 		private double _speedKnots;
 		private Angle _track = Angle.Zero;
@@ -52,6 +50,7 @@ namespace AutoPilotControl
 		private Angle _autopilotHeading = Angle.Zero;
 		private char _autopilotStatus = ' ';
 		private Angle _autopilotDesiredHeading = Angle.Zero;
+		private bool _autopilotDesiredHeadingValid = false;
 
 		public MenuItems(GpioController controller, Pcf8563 rtc)
 		{
@@ -83,6 +82,14 @@ namespace AutoPilotControl
 			_destinationWp = string.Empty;
 		}
 
+		private event Action BackButtonClicked;
+
+		private event Action UpButtonClicked;
+		
+		private event Action DownButtonClicked;
+
+		private event Action EnterButtonClicked;
+
 		public void Beep()
 		{
 			_speaker.Start();
@@ -101,7 +108,7 @@ namespace AutoPilotControl
 
 			var mainMenu = new ArrayList();
 
-			mainMenu.Add(new MenuEntry("NMEA Display", ShowNmeaData));
+			mainMenu.Add(new MenuEntry("NMEA Display", ParserMode));
 
 			mainMenu.Add(new MenuEntry("Blink Led", () =>
 			{
@@ -276,7 +283,25 @@ namespace AutoPilotControl
 
 		private void OnBackButtonClicked(object sender, PinValueChangedEventArgs e)
 		{
-			_nmeaParserRunning = false;
+			BackButtonClicked?.Invoke();
+			Beep();
+		}
+
+		void OnUpButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
+		{
+			UpButtonClicked?.Invoke();
+			Beep();
+		}
+
+		void OnDownButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
+		{
+			DownButtonClicked?.Invoke();
+			Beep();
+		}
+
+		void OnEnterButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
+		{
+			EnterButtonClicked?.Invoke();
 			Beep();
 		}
 
@@ -307,20 +332,138 @@ namespace AutoPilotControl
 				_autopilotHeading = htd.ActualHeading;
 				_autopilotStatus = htd.Status.Length >= 1 ? htd.Status[0] : ' ';
 				_autopilotDesiredHeading = htd.DesiredHeading;
+				_autopilotDesiredHeadingValid = htd.DesiredHeadingValid;
 			}
 		}
 
-		public void ShowNmeaData()
+		private void ClearEvents()
 		{
-			_nmeaParserRunning = true;
+			BackButtonClicked = null;
+			UpButtonClicked = null;
+			DownButtonClicked = null;
+		}
+
+		private Angle AddAngle(Angle angle, Angle correction)
+		{
+			double newValue = angle.Degrees + correction.Degrees;
+			while (newValue < 0)
+			{
+				newValue += 360;
+			}
+
+			while (newValue >= 360)
+			{
+				newValue -= 360;
+			}
+
+			return Angle.FromDegrees(newValue);
+		}
+
+		private void AutopilotControlMenu(NmeaParser ps)
+		{
+			bool leave = false;
+			ArrayList modes = new ArrayList();
+			_display.Clear(0);
+			_display.UpdateScreen();
+
+			BackButtonClicked += () => leave = true;
+			string lastStatus = string.Empty;
+
+			bool hasValidDesiredHeading = false;
+			Angle desiredHeading = Angle.Zero;
+			while (!leave)
+			{
+				int y = 2;
+				var status = AutopilotStatusString();
+				if (status != lastStatus)
+				{
+					Size textSize = _gfx.MeasureString(status, _bigFont, 0, 0);
+					int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
+					_display.FastFillRectangle(0, y, _display.Width, textSize.Height + y, 0);
+					_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
+					
+					if (IsAutopilotActive())
+					{
+						if (_autopilotDesiredHeadingValid)
+						{
+							desiredHeading = _autopilotDesiredHeading;
+							hasValidDesiredHeading = true;
+						}
+						if (hasValidDesiredHeading)
+						{
+							ValueBlock(false, false, "Desired HDG", desiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+						}
+					}
+
+					_display.UpdateScreen();
+					if (_up.Read() == PinValue.Low)
+					{
+						SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(-1)), ps);
+					}
+
+					if (_down.Read() == PinValue.Low)
+					{
+						SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(1)), ps);
+					}
+				}
+			}
+
+			ClearEvents();
+		}
+
+		private void SendHeadingCorrection(char newStatus, Angle newAngle, NmeaParser ps)
+		{
+			var msg = new HeadingAndTrackControl(newStatus.ToString(), Angle.Zero, string.Empty, string.Empty, Angle.Zero, Angle.Zero, Length.Zero, 1, newAngle,
+				Length.Zero, newAngle, false);
+			ps.SendMessage(msg);
+		}
+
+		public void ParserMode()
+		{
 			NmeaParser ps = new NmeaParser(UDP_PORT);
-			ps.NewMessage += OnNewMessage;
+			_controller.RegisterCallbackForPinValueChangedEvent(_topButton.PinNumber, PinEventTypes.Falling, OnBackButtonClicked);
+			_controller.RegisterCallbackForPinValueChangedEvent(_up.PinNumber, PinEventTypes.Falling, OnUpButtonClicked);
+			_controller.RegisterCallbackForPinValueChangedEvent(_down.PinNumber, PinEventTypes.Falling, OnDownButtonClicked);
+			_controller.RegisterCallbackForPinValueChangedEvent(_enter.PinNumber, PinEventTypes.Falling, OnEnterButtonClicked);
 
+			bool leave = false;
+			ArrayList modes = new ArrayList();
+			modes.Add(new MenuEntry("GPS Status", () => ShowNmeaData(0, ps)));
+			modes.Add(new MenuEntry("NAV Status", () => ShowNmeaData(1, ps)));
+			modes.Add(new MenuEntry("AP Status", () => ShowNmeaData(2, ps)));
+			modes.Add(new MenuEntry("AP Control", () => AutopilotControlMenu(ps)));
+			modes.Add(new MenuEntry("Back", () => leave = true));
+
+			try
+			{
+				ps.NewMessage += OnNewMessage;
+				ps.StartDecode();
+
+				while (!leave)
+				{
+					ShowMenu("NMEA Display", modes);
+				}
+			}
+			finally
+			{
+				ps.StopDecode();
+				ps.Dispose();
+
+				_controller.UnregisterCallbackForPinValueChangedEvent(_topButton.PinNumber, OnBackButtonClicked);
+				_controller.UnregisterCallbackForPinValueChangedEvent(_up.PinNumber, OnUpButtonClicked);
+				_controller.UnregisterCallbackForPinValueChangedEvent(_down.PinNumber, OnDownButtonClicked);
+				_controller.UnregisterCallbackForPinValueChangedEvent(_enter.PinNumber, OnEnterButtonClicked);
+			}
+		}
+
+		public void ShowNmeaData(int startPage, NmeaParser parser)
+		{
 			const int numPages = 3;
-			int page = 0;
+			int page = startPage % numPages;
 			bool fullRefreshPending = true;
+			bool nmeaParserRunning = true;
 
-			void OnUpButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
+			UpButtonClicked += () =>
 			{
 				if (page > 0)
 				{
@@ -332,101 +475,95 @@ namespace AutoPilotControl
 				}
 
 				fullRefreshPending = true;
-				Beep();
-			}
+			};
 
-			void OnDownButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
+			DownButtonClicked += () =>
 			{
 				page = (page + 1) % numPages;
 				fullRefreshPending = true;
-				Beep();
-			}
+			};
 
-			try
+			BackButtonClicked += () => nmeaParserRunning = false;
+
+			bool hadData = true; // flag to avoid constantly redrawing the no-data symbol, which is expensive
+			while (nmeaParserRunning)
 			{
-				ps.StartDecode();
-				_controller.RegisterCallbackForPinValueChangedEvent(_topButton.PinNumber, PinEventTypes.Falling, OnBackButtonClicked);
-				_controller.RegisterCallbackForPinValueChangedEvent(_up.PinNumber, PinEventTypes.Falling, OnUpButtonClicked);
-				_controller.RegisterCallbackForPinValueChangedEvent(_down.PinNumber, PinEventTypes.Falling, OnDownButtonClicked);
-				bool hadData = true; // flag to avoid constantly redrawing the no-data symbol, which is expensive
-				while (_nmeaParserRunning)
+				bool fullRefresh = false;
+				if (fullRefreshPending)
 				{
-					bool fullRefresh = false;
-					if (fullRefreshPending)
+					_display.Clear(false);
+					fullRefresh = true;
+					fullRefreshPending = false;
+				}
+
+				if (parser.IsReceivingData)
+				{
+					int y = 0;
+					if (page == 0)
 					{
-						_display.Clear(false);
-						fullRefresh = true;
-						fullRefreshPending = false;
+						ValueBlock(false, fullRefresh, "Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
+						ValueBlock(false, fullRefresh, "Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
+						ValueBlock(true, fullRefresh, "SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
+						ValueBlock(true, fullRefresh, "TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+					}
+					else if (page == 1)
+					{
+						ValueBlock(true, fullRefresh, "WPT", _destinationWp, string.Empty, ref y, Color.White);
+						ValueBlock(true, fullRefresh, "DST to WP", _distanceToWaypoint.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
+						ValueBlock(true, fullRefresh, "VMG", _vmgKnots.ToString("F2"), "kts", ref y, Color.White);
+						ValueBlock(true, fullRefresh, "BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+						ValueBlock(true, fullRefresh, "XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
+					}
+					else if (page == 2)
+					{
+						var status = AutopilotStatusString();
+
+						y = 2;
+						Size textSize = _gfx.MeasureString(status, _bigFont, 0, 0);
+						int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
+						_display.FastFillRectangle(0, y, _display.Width, textSize.Height + y, 0);
+						_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
+						y += textSize.Height + 2;
+						_display.DrawHorizontalLine(0, y - 1, 200, 0xff);
+						ValueBlock(true, fullRefresh, "AP HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+						if (_autopilotStatus != ' ' && _autopilotStatus != 'M')
+						{
+							ValueBlock(false, fullRefresh, "AP DES HDG", _autopilotDesiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+						}
 					}
 
-					if (ps.IsReceivingData)
-					{
-						int y = 0;
-						if (page == 0)
-						{
-							ValueBlock(false, fullRefresh, "Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
-							ValueBlock(false, fullRefresh, "Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
-							ValueBlock(true, fullRefresh, "SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
-							ValueBlock(true, fullRefresh, "TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
-						}
-						else if (page == 1)
-						{
-							ValueBlock(true, fullRefresh, "WPT", _destinationWp, string.Empty, ref y, Color.White);
-							ValueBlock(true, fullRefresh, "DST to WP", _distanceToWaypoint.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
-							ValueBlock(true, fullRefresh, "VMG", _vmgKnots.ToString("F2"), "kts", ref y, Color.White);
-							ValueBlock(true, fullRefresh, "BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
-							ValueBlock(true, fullRefresh, "XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
-						}
-						else if (page == 2)
-						{
-							string status = _autopilotStatus switch
-							{
-								'S' => "Auto",
-								'T' => "Track",
-								'M' => "Manual",
-								'W' => "Wind",
-								_ => "Offline",
-							};
+					hadData = true;
 
-							y = 2;
-							Size textSize = _gfx.MeasureString(status, _bigFont, 0, 0);
-							int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
-							_display.FastFillRectangle(0, y, _display.Width, textSize.Height + y, 0);
-							_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
-							y += textSize.Height + 2;
-							_display.DrawHorizontalLine(0, y - 1, 200, 0xff);
-							ValueBlock(true, fullRefresh, "AP HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
-							if (_autopilotStatus != ' ' && _autopilotStatus != 'M')
-							{
-								ValueBlock(false, fullRefresh, "AP DES HDG", _autopilotDesiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
-							}
-						}
+					_display.UpdateScreen();
+				}
+				else if (hadData)
+				{
+					_gfx.DrawTextEx("No data", _bigFont, 0, 0, Color.White);
+					_gfx.DrawCircle(100, 100, 70, Color.White, true);
+					_gfx.DrawRectangle(40, 90, 120, 20, Color.Black, true);
+					hadData = false;
 
-						hadData = true;
-
-						_display.UpdateScreen();
-					}
-					else if (hadData)
-					{
-						_gfx.DrawTextEx("No data", _bigFont, 0, 0, Color.White);
-						_gfx.DrawCircle(100, 100, 70, Color.White, true);
-						_gfx.DrawRectangle(40, 90, 120, 20, Color.Black, true);
-						hadData = false;
-
-						_display.UpdateScreen();
-					}
-
-					// Thread.Sleep(100);
+					_display.UpdateScreen();
 				}
 			}
-			finally
+		}
+
+		private bool IsAutopilotActive()
+		{
+			return _autopilotStatus is 'S' or 'T' or 'W';
+		}
+
+		private string AutopilotStatusString()
+		{
+			string status = _autopilotStatus switch
 			{
-				_controller.UnregisterCallbackForPinValueChangedEvent(_topButton.PinNumber, OnBackButtonClicked);
-				_controller.UnregisterCallbackForPinValueChangedEvent(_up.PinNumber, OnUpButtonClicked);
-				_controller.UnregisterCallbackForPinValueChangedEvent(_down.PinNumber, OnDownButtonClicked);
-				ps.StopDecode();
-				ps.Dispose();
-			}
+				'S' => "Auto",
+				'T' => "Track",
+				'M' => "Manual",
+				'W' => "Wind",
+				_ => "Offline",
+			};
+			return status;
 		}
 
 		private void ValueBlock(bool singleLine, bool fullRefresh, string label, string value, string unit, ref int y, Color color)

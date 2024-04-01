@@ -239,10 +239,25 @@ namespace Iot.Device.Nmea0183.Sentences
             }
         }
 
-        /// <summary>
-        /// Decodes the next field into an int
-        /// </summary>
-        protected int ReadInt(IEnumerator field)
+        protected double ReadValue(IEnumerator field, out bool valid)
+        {
+	        string val = ReadString(field);
+	        if (string.IsNullOrEmpty(val))
+	        {
+		        valid = false;
+		        return 0;
+	        }
+	        else
+	        {
+		        valid = true;
+		        return double.Parse(val);
+	        }
+        }
+
+		/// <summary>
+		/// Decodes the next field into an int
+		/// </summary>
+		protected int ReadInt(IEnumerator field)
         {
             string val = ReadString(field);
             if (string.IsNullOrEmpty(val))
