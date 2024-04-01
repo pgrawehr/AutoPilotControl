@@ -283,26 +283,26 @@ namespace AutoPilotControl
 
 		private void OnBackButtonClicked(object sender, PinValueChangedEventArgs e)
 		{
-			BackButtonClicked?.Invoke();
 			Beep();
+			BackButtonClicked?.Invoke();
 		}
 
 		void OnUpButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
 		{
-			UpButtonClicked?.Invoke();
 			Beep();
+			UpButtonClicked?.Invoke();
 		}
 
 		void OnDownButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
 		{
-			DownButtonClicked?.Invoke();
 			Beep();
+			DownButtonClicked?.Invoke();
 		}
 
 		void OnEnterButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
 		{
-			EnterButtonClicked?.Invoke();
 			Beep();
+			EnterButtonClicked?.Invoke();
 		}
 
 		private void OnNewMessage(NmeaSentence sentence)
@@ -346,6 +346,15 @@ namespace AutoPilotControl
 		private Angle AddAngle(Angle angle, Angle correction)
 		{
 			double newValue = angle.Degrees + correction.Degrees;
+			if (correction.Degrees > 0)
+			{
+				newValue = Math.Ceiling(newValue);
+			}
+			else
+			{
+				newValue = Math.Floor(newValue);
+			}
+
 			while (newValue < 0)
 			{
 				newValue += 360;
@@ -362,15 +371,53 @@ namespace AutoPilotControl
 		private void AutopilotControlMenu(NmeaParser ps)
 		{
 			bool leave = false;
-			ArrayList modes = new ArrayList();
+			bool enterMenu = false;
 			_display.Clear(0);
-			_display.UpdateScreen();
 
 			BackButtonClicked += () => leave = true;
 			string lastStatus = string.Empty;
 
 			bool hasValidDesiredHeading = false;
 			Angle desiredHeading = Angle.Zero;
+			bool narrowDeadbandLimit = false;
+			bool firstTime = true;
+
+			int correctionValue = 0;
+			DownButtonClicked += () =>
+			{
+				Interlocked.Increment(ref correctionValue);
+				while (_up.Read() == PinValue.Low)
+				{
+					// Continue incrementing until the button is released
+					Interlocked.Increment(ref correctionValue);
+					Thread.Sleep(10);
+				}
+			};
+
+			UpButtonClicked += () =>
+			{
+				Interlocked.Decrement(ref correctionValue);
+				while (_up.Read() == PinValue.Low)
+				{
+					// Continue decrementing until the button is released
+					Interlocked.Decrement(ref correctionValue);
+					Thread.Sleep(10);
+				}
+			};
+
+			EnterButtonClicked += () =>
+			{
+				enterMenu = true;
+			};
+
+
+			ArrayList modeMenu = new ArrayList();
+			modeMenu.Add(new MenuEntry("Standby", () => SendHeadingCorrection('M', Angle.Zero, false, false, ps)));
+			modeMenu.Add(new MenuEntry("Auto", () => SendHeadingCorrection('S', Angle.Zero, false, false, ps)));
+			modeMenu.Add(new MenuEntry("Track", () => SendHeadingCorrection('T', Angle.Zero, false, false, ps)));
+			modeMenu.Add(new MenuEntry("Wind", () => SendHeadingCorrection('W', Angle.Zero, false, false, ps)));
+			modeMenu.Add(new MenuEntry("Back", () => { }));
+
 			while (!leave)
 			{
 				int y = 2;
@@ -381,7 +428,23 @@ namespace AutoPilotControl
 					int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
 					_display.FastFillRectangle(0, y, _display.Width, textSize.Height + y, 0);
 					_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
-					
+
+					y += textSize.Height + 2;
+					ValueBlock(false, firstTime, "Current HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+					string desHdgString = hasValidDesiredHeading ? desiredHeading.Degrees.ToString("F0") + "°" : "N/A";
+					ValueBlock(false, firstTime, "Desired HDG", desHdgString, string.Empty, ref y, Color.White);
+
+					firstTime = false;
+					_display.UpdateScreen();
+
+					if (enterMenu)
+					{
+						ShowMenu("Change Mode", modeMenu);
+						enterMenu = false;
+						Interlocked.Exchange(ref correctionValue, 0);
+						firstTime = true;
+					}
+
 					if (IsAutopilotActive())
 					{
 						if (_autopilotDesiredHeadingValid)
@@ -389,21 +452,16 @@ namespace AutoPilotControl
 							desiredHeading = _autopilotDesiredHeading;
 							hasValidDesiredHeading = true;
 						}
-						if (hasValidDesiredHeading)
-						{
-							ValueBlock(false, false, "Desired HDG", desiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
-						}
+					}
+					else
+					{
+						narrowDeadbandLimit = false;
 					}
 
-					_display.UpdateScreen();
-					if (_up.Read() == PinValue.Low)
+					int delta = Interlocked.Exchange(ref correctionValue, 0);
+					if (delta != 0)
 					{
-						SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(-1)), ps);
-					}
-
-					if (_down.Read() == PinValue.Low)
-					{
-						SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(1)), ps);
+						SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(delta)), true, narrowDeadbandLimit, ps);
 					}
 				}
 			}
@@ -411,9 +469,10 @@ namespace AutoPilotControl
 			ClearEvents();
 		}
 
-		private void SendHeadingCorrection(char newStatus, Angle newAngle, NmeaParser ps)
+		private void SendHeadingCorrection(char newStatus, Angle newAngle, bool newAngleValid, bool narrowDeadBandMode, NmeaParser ps)
 		{
-			var msg = new HeadingAndTrackControl(newStatus.ToString(), Angle.Zero, string.Empty, string.Empty, Angle.Zero, Angle.Zero, Length.Zero, 1, newAngle,
+			var msg = new HeadingAndTrackControl(newStatus.ToString(), Angle.Zero, string.Empty, string.Empty, Angle.Zero, 
+				narrowDeadBandMode ? Angle.Zero : Angle.FromDegrees(10), Length.Zero, 1, newAngle, newAngleValid,
 				Length.Zero, newAngle, false);
 			ps.SendMessage(msg);
 		}

@@ -116,6 +116,9 @@ namespace AutoPilotControl
 			////_resetPin.Write(PinValue.High);
 			////Thread.Sleep(10);
 			RunInitSequence();
+
+			SetInvertMode(false);
+			UpdateScreen(true, true);
 		}
 
 		public int Width => 200;
@@ -186,11 +189,14 @@ namespace AutoPilotControl
 		{
 			if (invert)
 			{
-				WriteCommandSequence(0x50, 0xC7);
+				// Also set the DDX[1] bit, which disables double buffering and thus results in a much faster update
+				// Unfortunately, the data sheet fails to describe how to correctly use the double buffer mode.
+				WriteCommandSequence(0x50, 0xE7);
 			}
 			else
 			{
-				WriteCommandSequence(0x50, 0xD7);
+				// The DDX[0] bit, which is added here, inverts the screen
+				WriteCommandSequence(0x50, 0xF7);
 			}
 		}
 
@@ -359,13 +365,32 @@ namespace AutoPilotControl
 
 		public void UpdateScreen()
 		{
+			UpdateScreen(false, true);
+		}
+
+		public void UpdateScreen(bool buffer1, bool buffer2)
+		{
 			WaitReady();
-			WriteCommand(0x13);
-			_bus.Write(_bitBuffer.Buffer);
+			if (buffer1)
+			{
+				WriteCommand(0x10);
+				_bus.Write(_bitBuffer.Buffer);
 
-			Thread.Sleep(2);
+				Thread.Sleep(2);
 
-			WriteCommand(0x12);
+				WriteCommand(0x11);
+			}
+
+			if (buffer2)
+			{
+				WriteCommand(0x13);
+				_bus.Write(_bitBuffer.Buffer);
+
+				Thread.Sleep(2);
+
+				WriteCommand(0x12);
+			}
+
 			WaitReady();
 		}
 

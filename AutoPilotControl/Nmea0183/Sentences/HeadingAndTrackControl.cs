@@ -40,17 +40,19 @@ namespace Iot.Device.Nmea0183.Sentences
         /// <param name="turnRadius">Desired turn radius</param>
         /// <param name="rateOfTurn">Desired rate of turn</param>
         /// <param name="desiredHeading">Desired heading</param>
+        /// <param name="desiredHeadingValid">True if desired heading is to be set</param>
         /// <param name="offTrackLimit">Desired off-track limit</param>
         /// <param name="commandedTrack">Commanded track direction</param>
         /// <param name="headingIsTrue">Heading uses true angles</param>
         public HeadingAndTrackControl(string status, Angle commandedRudderAngle, string commandedRudderDirection, string turnMode,
-            Angle rudderLimit, Angle offHeadingLimit, Length turnRadius, double rateOfTurn, Angle desiredHeading, Length offTrackLimit, Angle commandedTrack, bool headingIsTrue)
+            Angle rudderLimit, Angle offHeadingLimit, Length turnRadius, double rateOfTurn, Angle desiredHeading, bool desiredHeadingValid, 
+            Length offTrackLimit, Angle commandedTrack, bool headingIsTrue)
         : base(OwnTalkerId, Id, DateTime.UtcNow)
         {
             Valid = true;
             Status = status;
             DesiredHeading = desiredHeading;
-            DesiredHeadingValid = desiredHeading.Degrees >= 0;
+            DesiredHeadingValid = desiredHeadingValid;
             CommandedRudderAngle = commandedRudderAngle;
             HeadingIsTrue = headingIsTrue;
             CommandedRudderDirection = commandedRudderDirection;
@@ -78,7 +80,7 @@ namespace Iot.Device.Nmea0183.Sentences
             : base(talkerId, Id, time)
         {
             IEnumerator field = fields.GetEnumerator();
-
+            bool valid = false;
             string manualOverride = ReadString(field);
             CommandedRudderAngle = AsAngle(ReadValue(field));
             CommandedRudderDirection = ReadString(field);
@@ -89,7 +91,7 @@ namespace Iot.Device.Nmea0183.Sentences
             OffHeadingLimit = AsAngle(ReadValue(field));
             TurnRadius = AsLength(ReadValue(field));
             RateOfTurn = ReadValue(field);
-            DesiredHeading = AsAngle(ReadValue(field, out bool valid));
+            DesiredHeading = AsAngle(ReadValue(field, out valid));
             DesiredHeadingValid = valid;
             OffTrackLimit = AsLength(ReadValue(field));
             CommandedTrack = AsAngle(ReadValue(field));
