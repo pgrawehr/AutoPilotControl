@@ -27,7 +27,7 @@ namespace AutoPilotControl
 			m_client = new UdpClient(m_udpPort);
 			m_client.Client.ReceiveTimeout = 5000;
 			m_client.Client.SetSocketOption(SocketOptionLevel.Udp, SocketOptionName.Broadcast, true);
-			m_client.Connect(IPAddress.Any, m_udpPort);
+			// m_client.Connect(IPAddress.Parse("192.168.1.255"), m_udpPort);
 		}
 
 		public event MessageReceivedDelegate NewMessage;
@@ -74,7 +74,7 @@ namespace AutoPilotControl
 		{
 			string msg = sentence.ToNmeaMessage() + "\r\n";
 			byte[] data = Encoding.UTF8.GetBytes(msg);
-			m_client.Send(data);
+			m_client.Send(data, new IPEndPoint(IPAddress.Broadcast, m_udpPort));
 		}
 
 		private void HandleUdpNmeaStream()
@@ -85,7 +85,7 @@ namespace AutoPilotControl
 			{
 				try
 				{
-					var remote = new IPEndPoint(IPAddress.Any, 0);
+					var remote = new IPEndPoint(IPAddress.Any, m_udpPort);
 					int length = m_client.Receive(buffer, ref remote);
 					if (length > 2 && length < buffer.Length)
 					{
