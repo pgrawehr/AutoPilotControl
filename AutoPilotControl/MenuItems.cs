@@ -92,9 +92,13 @@ namespace AutoPilotControl
 
 		public void Beep()
 		{
-			_speaker.Start();
-			Thread.Sleep(50);
-			_speaker.Stop();
+			lock (_speaker)
+			{
+				_speaker.Frequency = 1000;
+				_speaker.Start();
+				Thread.Sleep(50);
+				_speaker.Stop();
+			}
 		}
 
 		public void Run()
@@ -199,6 +203,14 @@ namespace AutoPilotControl
 			}
 		}
 
+		private void WaitNoButtonsPressed()
+		{
+			while (_up.Read() == PinValue.Low || _down.Read() == PinValue.Low || _enter.Read() == PinValue.Low || _topButton.Read() == PinValue.Low)
+			{
+				Thread.Sleep(10);
+			}
+		}
+
 		private void ShowMenu(String title, ArrayList menuOptions)
 		{
 			int selectedEntry = 0;
@@ -224,11 +236,12 @@ namespace AutoPilotControl
 				{
 					if (_down.Read() == PinValue.Low)
 					{
-						Beep();
 						if (selectedEntry < menuOptions.Count - 1)
 						{
+							Beep();
 							// Inverse again to un-mark the selected entry
 							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
+							WaitNoButtonsPressed();
 							selectedEntry++;
 							break;
 						}
@@ -236,11 +249,12 @@ namespace AutoPilotControl
 
 					if (_up.Read() == PinValue.Low)
 					{
-						Beep();
 						if (selectedEntry > 0)
 						{
+							Beep();
 							// Inverse again to un-mark the selected entry
 							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
+							WaitNoButtonsPressed();
 							selectedEntry--;
 							break;
 						}
@@ -251,6 +265,7 @@ namespace AutoPilotControl
 						Beep();
 						MenuEntry menuEntry = (MenuEntry)menuOptions[selectedEntry];
 						menuEntry.Execute();
+						WaitNoButtonsPressed();
 						return;
 					}
 				}
@@ -372,7 +387,7 @@ namespace AutoPilotControl
 		{
 			bool leave = false;
 			bool enterMenu = false;
-			_display.Clear(0);
+			_display.Clear(false);
 
 			BackButtonClicked += () => leave = true;
 			string lastStatus = string.Empty;
@@ -386,11 +401,18 @@ namespace AutoPilotControl
 			DownButtonClicked += () =>
 			{
 				Interlocked.Increment(ref correctionValue);
-				while (_up.Read() == PinValue.Low)
+				while (_down.Read() == PinValue.Low)
 				{
 					// Continue incrementing until the button is released
 					Interlocked.Increment(ref correctionValue);
-					Thread.Sleep(10);
+					Thread.Sleep(50);
+					lock (_speaker)
+					{
+						_speaker.Frequency = 800;
+						_speaker.Start();
+						Thread.Sleep(20);
+						_speaker.Stop();
+					}
 				}
 			};
 
@@ -401,7 +423,14 @@ namespace AutoPilotControl
 				{
 					// Continue decrementing until the button is released
 					Interlocked.Decrement(ref correctionValue);
-					Thread.Sleep(10);
+					Thread.Sleep(50);
+					lock (_speaker)
+					{
+						_speaker.Frequency = 1400;
+						_speaker.Start();
+						Thread.Sleep(20);
+						_speaker.Stop();
+					}
 				}
 			};
 
@@ -442,6 +471,7 @@ namespace AutoPilotControl
 						ShowMenu("Change Mode", modeMenu);
 						enterMenu = false;
 						Interlocked.Exchange(ref correctionValue, 0);
+						_display.Clear(false);
 						firstTime = true;
 					}
 
@@ -471,6 +501,15 @@ namespace AutoPilotControl
 
 		private void SendHeadingCorrection(char newStatus, Angle newAngle, bool newAngleValid, bool narrowDeadBandMode, NmeaParser ps)
 		{
+			if (newAngleValid)
+			{
+				Debug.WriteLine($"Remaining in status {newStatus}, delta: {newAngle.Degrees}");
+			}
+			else
+			{
+				Debug.WriteLine($"Setting new status {newStatus}");
+			}
+
 			var msg = new HeadingAndTrackControl(newStatus.ToString(), Angle.Zero, string.Empty, string.Empty, Angle.Zero, 
 				narrowDeadBandMode ? Angle.Zero : Angle.FromDegrees(10), Length.Zero, 1, newAngle, newAngleValid,
 				Length.Zero, newAngle, false);
