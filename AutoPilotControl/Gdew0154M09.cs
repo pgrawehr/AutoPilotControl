@@ -347,17 +347,7 @@ namespace AutoPilotControl
 
 		public void SetPixel(int x, int y, int color)
 		{
-			// Ignore out-of-bounds drawing (simplifies clipping)
-			if (x < 0 || x >= Width)
-			{
-				return;
-			}
-
-			if (y < 0 || y >= Height)
-			{
-				return;
-			}
-
+			// No out-of-bounds check here, to save time (should be done on parent level)
 			int byteOffset = (y * 25) + (x / 8);
 			int bit = x % 8;
 			bit = 0x80 >> bit;

@@ -32,7 +32,7 @@ namespace AutoPilotControl
 				if (col >= gfx.EPaperDisplay.Width)
 				{
 					col = 0;
-					line += font.Height + 1;
+					line += fontHeight + 1;
 				}
 
 				var characterBitmap = font[character];
