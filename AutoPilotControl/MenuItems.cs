@@ -16,6 +16,8 @@ using Iot.Device.Nmea0183.Sentences;
 using Iot.Device.Rtc;
 using UnitsNet;
 using System.Device.Spi;
+using Iot.Device.EPaper.Buffers;
+using Point = System.Drawing.Point;
 
 namespace AutoPilotControl
 {
@@ -211,18 +213,36 @@ namespace AutoPilotControl
 			}
 		}
 
-		private void ShowMenu(String title, ArrayList menuOptions)
+		private void ShowMenu(string title, ArrayList menuOptions)
+		{
+			IFrameBuffer dummy = null;
+			ShowMenu(title, menuOptions, false, ref dummy);
+		}
+
+		private void ShowMenu(String title, ArrayList menuOptions, bool doSaveBuffer, ref IFrameBuffer menuRestoreBuffer)
 		{
 			int selectedEntry = 0;
-			_display.Clear(false);
-			_gfx.DrawTextEx(title, _bigFont, 0, 10, Color.White);
-			_gfx.DrawLine(0, 36, 200, 36, Color.White);
-			int y = 40;
-			for (int i = 0; i < menuOptions.Count; i++)
+			if (menuRestoreBuffer == null)
 			{
-				MenuEntry menuEntry = (MenuEntry)menuOptions[i];
-				_gfx.DrawTextEx(menuEntry.ToString(), _bigFont, 0, y + 1, Color.White);
-				y += _bigFont.Height + 2;
+				_display.Clear(false);
+				_gfx.DrawTextEx(title, _bigFont, 0, 10, Color.White);
+				_gfx.DrawLine(0, 36, 200, 36, Color.White);
+				int y = 40;
+				for (int i = 0; i < menuOptions.Count; i++)
+				{
+					MenuEntry menuEntry = (MenuEntry)menuOptions[i];
+					_gfx.DrawTextEx(menuEntry.ToString(), _bigFont, 0, y + 1, Color.White);
+					y += _bigFont.Height + 2;
+				}
+
+				if (doSaveBuffer)
+				{
+					menuRestoreBuffer = _display.CloneFrameBuffer();
+				}
+			}
+			else
+			{
+				_gfx.DrawBitmap(menuRestoreBuffer);
 			}
 
 			while (true)
@@ -447,6 +467,8 @@ namespace AutoPilotControl
 			modeMenu.Add(new MenuEntry("Wind", () => SendHeadingCorrection('W', Angle.Zero, false, false, ps)));
 			modeMenu.Add(new MenuEntry("Back", () => { }));
 
+			// Only calculate the menu once (ideally even right here, at startup)
+			IFrameBuffer menuBackupBuffer = null;
 			while (!leave)
 			{
 				int y = 2;
@@ -468,7 +490,7 @@ namespace AutoPilotControl
 
 					if (enterMenu)
 					{
-						ShowMenu("Change Mode", modeMenu);
+						ShowMenu("Change Mode", modeMenu, true, ref menuBackupBuffer);
 						enterMenu = false;
 						Interlocked.Exchange(ref correctionValue, 0);
 						_display.Clear(false);

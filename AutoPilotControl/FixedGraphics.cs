@@ -3,6 +3,7 @@ using Iot.Device.EPaper.Drivers;
 using nanoFramework.UI;
 using System.Drawing;
 using Iot.Device.EPaper;
+using Iot.Device.EPaper.Buffers;
 
 namespace AutoPilotControl
 {
@@ -114,6 +115,17 @@ namespace AutoPilotControl
 			int height = font.Height;
 
 			return new Size(width, height + lineSpacing);
+		}
+
+		/// <summary>
+		/// Copies the given buffer to the target, as fast as possible.
+		/// This method does no resizing or scaling
+		/// </summary>
+		/// <param name="gfx">Graphics object with destination buffer</param>
+		/// <param name="source">Source frame buffer</param>
+		public static void DrawBitmap(this Graphics gfx, IFrameBuffer source)
+		{
+			Array.Copy(source.Buffer, gfx.EPaperDisplay.FrameBuffer.Buffer, source.BufferByteCount);
 		}
 	}
 }

@@ -157,6 +157,18 @@ namespace AutoPilotControl
 			// Nothing to do?
 		}
 
+		/// <summary>
+		/// Returns the current frame buffer and internally creates a new frame buffer.
+		/// The returned buffer can thus be used to quickly restore the current buffer contents.
+		/// </summary>
+		/// <returns>A copy of the current frame buffer</returns>
+		public IFrameBuffer CloneFrameBuffer()
+		{
+			IFrameBuffer ret = _bitBuffer;
+			_bitBuffer = new FrameBuffer1BitPerPixel(_bitBuffer.Height, _bitBuffer.Width, (byte[])_bitBuffer.Buffer.Clone());
+			return ret;
+		}
+
 		public bool NextFramePage()
 		{
 			throw new NotImplementedException();
