@@ -23,7 +23,7 @@ namespace AutoPilotControl
 {
 	internal class MenuItems
 	{
-		private const int UDP_PORT = 10110;
+		private const int UDP_PORT = 10101;
 		private const int LED_PIN = 10;
 		private readonly GpioController _controller;
 		private readonly Gdew0154M09 _display;
@@ -252,6 +252,9 @@ namespace AutoPilotControl
 
 				_display.UpdateScreen();
 
+				// Debouncing helper (initially set, as we expect no buttons to be pressed when a menu is first displayed)
+				WaitNoButtonsPressed();
+
 				while (true)
 				{
 					if (_down.Read() == PinValue.Low)
@@ -261,7 +264,6 @@ namespace AutoPilotControl
 							Beep();
 							// Inverse again to un-mark the selected entry
 							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
-							WaitNoButtonsPressed();
 							selectedEntry++;
 							break;
 						}
@@ -274,7 +276,6 @@ namespace AutoPilotControl
 							Beep();
 							// Inverse again to un-mark the selected entry
 							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
-							WaitNoButtonsPressed();
 							selectedEntry--;
 							break;
 						}

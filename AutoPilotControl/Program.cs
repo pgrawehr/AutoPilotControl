@@ -40,11 +40,18 @@ namespace AutoPilotControl
 			s_rtc = new Pcf8563(device);
 
 			// Reasonable date?
-			if (s_rtc.DateTime.Year >= 2024)
+			try
 			{
-				Rtc.SetSystemTime(s_rtc.DateTime);
+				var rtcTime = s_rtc.DateTime;
+				if (rtcTime.Year >= 2024)
+				{
+					Rtc.SetSystemTime(s_rtc.DateTime);
+				}
 			}
-			
+			catch (ArgumentOutOfRangeException)
+			{
+				Debug.WriteLine("RTC clock lost the correct time");
+			}
 
 			var dt = DateTime.UtcNow;
 			Debug.WriteLine($"Startup Time: {dt.ToString("yyyy/MM/dd HH:mm:ss")}");
