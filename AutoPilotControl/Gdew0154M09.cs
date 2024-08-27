@@ -22,6 +22,7 @@ namespace AutoPilotControl
 			0x61, 3, 0xc8, 0x00, 0xc8, //resolution setting
 			0x60, 1, 0x00, //Tcon setting
 			0xe3, 1, 0x00,
+			0x30, 1, 0x3f,
 			0x04, 0, //Power on
 			// 0x00, 0x82, 0xff, 0x0e, 160, //panel setting (with delay bit)
 
@@ -277,10 +278,7 @@ namespace AutoPilotControl
 
 		public void Clear(bool triggerPageRefresh = false)
 		{
-			for (int i = 0; i < _bitBuffer.BufferByteCount; i++)
-			{
-				_bitBuffer[i] = 0;
-			}
+			_bitBuffer.Clear();
 
 			if (triggerPageRefresh)
 			{

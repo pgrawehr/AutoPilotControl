@@ -63,7 +63,7 @@ namespace AutoPilotControl
 
 			var spiDevice = SpiDevice.Create(connectionSettings);
 			_display = new Gdew0154M09(0, 15, 4, spiDevice, 9, _controller, false);
-			_display.Clear(0);
+			_display.Clear(true);
 			_display.SetInvertMode(true);
 
 			_gfx = new Graphics(_display);
@@ -410,7 +410,13 @@ namespace AutoPilotControl
 			bool enterMenu = false;
 			_display.Clear(false);
 
-			BackButtonClicked += () => leave = true;
+			bool cancel = false;
+
+			BackButtonClicked += () =>
+			{
+				leave = true;
+				cancel = true;
+			};
 			string lastStatus = string.Empty;
 
 			bool hasValidDesiredHeading = false;
@@ -458,6 +464,7 @@ namespace AutoPilotControl
 			EnterButtonClicked += () =>
 			{
 				enterMenu = true;
+				cancel = true;
 			};
 
 
@@ -474,48 +481,49 @@ namespace AutoPilotControl
 			{
 				int y = 2;
 				var status = AutopilotStatusString();
-				if (status != lastStatus)
+
+				Size textSize = _gfx.MeasureString(status, _bigFont, 0, 0);
+				int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
+				_display.FastFillRectangle(0, y, _display.Width, textSize.Height + y, 0);
+				_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
+
+				y += textSize.Height + 2;
+				ValueBlock(false, firstTime, "Current HDG", _autopilotHeading.Degrees.ToString("F0") + "°",
+					string.Empty, ref y, ref cancel, Color.White);
+				string desHdgString = hasValidDesiredHeading ? desiredHeading.Degrees.ToString("F0") + "°" : "N/A";
+				ValueBlock(false, firstTime, "Desired HDG", desHdgString, string.Empty, ref y, ref cancel, Color.White);
+
+				firstTime = false;
+				_display.UpdateScreen();
+
+				if (enterMenu)
 				{
-					Size textSize = _gfx.MeasureString(status, _bigFont, 0, 0);
-					int startX = (_display.Width / 2) - (textSize.Width / 2); // center on screen
-					_display.FastFillRectangle(0, y, _display.Width, textSize.Height + y, 0);
-					_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
+					ShowMenu("Change Mode", modeMenu, true, ref menuBackupBuffer);
+					enterMenu = false;
+					Interlocked.Exchange(ref correctionValue, 0);
+					_display.Clear(false);
+					firstTime = true;
+					cancel = false;
+				}
 
-					y += textSize.Height + 2;
-					ValueBlock(false, firstTime, "Current HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
-					string desHdgString = hasValidDesiredHeading ? desiredHeading.Degrees.ToString("F0") + "°" : "N/A";
-					ValueBlock(false, firstTime, "Desired HDG", desHdgString, string.Empty, ref y, Color.White);
-
-					firstTime = false;
-					_display.UpdateScreen();
-
-					if (enterMenu)
+				if (IsAutopilotActive())
+				{
+					if (_autopilotDesiredHeadingValid)
 					{
-						ShowMenu("Change Mode", modeMenu, true, ref menuBackupBuffer);
-						enterMenu = false;
-						Interlocked.Exchange(ref correctionValue, 0);
-						_display.Clear(false);
-						firstTime = true;
+						desiredHeading = _autopilotDesiredHeading;
+						hasValidDesiredHeading = true;
 					}
+				}
+				else
+				{
+					narrowDeadbandLimit = false;
+				}
 
-					if (IsAutopilotActive())
-					{
-						if (_autopilotDesiredHeadingValid)
-						{
-							desiredHeading = _autopilotDesiredHeading;
-							hasValidDesiredHeading = true;
-						}
-					}
-					else
-					{
-						narrowDeadbandLimit = false;
-					}
-
-					int delta = Interlocked.Exchange(ref correctionValue, 0);
-					if (delta != 0)
-					{
-						SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(delta)), true, narrowDeadbandLimit, ps);
-					}
+				int delta = Interlocked.Exchange(ref correctionValue, 0);
+				if (delta != 0)
+				{
+					SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(delta)), true,
+						narrowDeadbandLimit, ps);
 				}
 			}
 
@@ -582,7 +590,7 @@ namespace AutoPilotControl
 			const int numPages = 3;
 			int page = startPage % numPages;
 			bool fullRefreshPending = true;
-			bool nmeaParserRunning = true;
+			bool nmeaParserRunning = true; // Require a full refresh. Also used as interrupt signal
 
 			UpButtonClicked += () =>
 			{
@@ -604,7 +612,11 @@ namespace AutoPilotControl
 				fullRefreshPending = true;
 			};
 
-			BackButtonClicked += () => nmeaParserRunning = false;
+			BackButtonClicked += () =>
+			{
+				nmeaParserRunning = false;
+				fullRefreshPending = true;
+			};
 
 			bool hadData = true; // flag to avoid constantly redrawing the no-data symbol, which is expensive
 			while (nmeaParserRunning)
@@ -615,6 +627,7 @@ namespace AutoPilotControl
 					_display.Clear(false);
 					fullRefresh = true;
 					fullRefreshPending = false;
+					Debug.WriteLine($"Full refresh, next page: {page}");
 				}
 
 				if (parser.IsReceivingData)
@@ -622,18 +635,18 @@ namespace AutoPilotControl
 					int y = 0;
 					if (page == 0)
 					{
-						ValueBlock(false, fullRefresh, "Latitude", _position.GetLatitudeString(), string.Empty, ref y, Color.White);
-						ValueBlock(false, fullRefresh, "Longitude", _position.GetLongitudeString(), string.Empty, ref y, Color.White);
-						ValueBlock(true, fullRefresh, "SOG", _speedKnots.ToString("F2"), "kts", ref y, Color.White);
-						ValueBlock(true, fullRefresh, "TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
+						ValueBlock(false, fullRefresh, "Latitude", _position.GetLatitudeString(), string.Empty, ref y, ref fullRefreshPending, Color.White);
+						ValueBlock(false, fullRefresh, "Longitude", _position.GetLongitudeString(), string.Empty, ref y, ref fullRefreshPending, Color.White);
+						ValueBlock(true, fullRefresh, "SOG", _speedKnots.ToString("F2"), "kts", ref y, ref fullRefreshPending, Color.White);
+						ValueBlock(true, fullRefresh, "TGT", _track.Degrees.ToString("F1") + "°", string.Empty, ref y, ref fullRefreshPending, Color.White);
 					}
 					else if (page == 1)
 					{
-						ValueBlock(true, fullRefresh, "WPT", _destinationWp, string.Empty, ref y, Color.White);
-						ValueBlock(true, fullRefresh, "DST to WP", _distanceToWaypoint.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
-						ValueBlock(true, fullRefresh, "VMG", _vmgKnots.ToString("F2"), "kts", ref y, Color.White);
-						ValueBlock(true, fullRefresh, "BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, Color.White);
-						ValueBlock(true, fullRefresh, "XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, Color.White);
+						ValueBlock(true, fullRefresh, "WPT", _destinationWp, string.Empty, ref y, ref fullRefreshPending, Color.White);
+						ValueBlock(true, fullRefresh, "WP DST", _distanceToWaypoint.NauticalMiles.ToString("F2"), "nm", ref y, ref fullRefreshPending, Color.White);
+						ValueBlock(true, fullRefresh, "VMG", _vmgKnots.ToString("F2"), "kts", ref y, ref fullRefreshPending, Color.White);
+						ValueBlock(true, fullRefresh, "BRG", _bearingToWaypoint.Degrees.ToString("F1") + "°", string.Empty, ref y, ref fullRefreshPending, Color.White);
+						ValueBlock(true, fullRefresh, "XTE", _crossTrackError.NauticalMiles.ToString("F2"), "nm", ref y, ref fullRefreshPending, Color.White);
 					}
 					else if (page == 2)
 					{
@@ -646,16 +659,19 @@ namespace AutoPilotControl
 						_gfx.DrawTextEx(status, _bigFont, startX, y, Color.White);
 						y += textSize.Height + 2;
 						_display.DrawHorizontalLine(0, y - 1, 200, 0xff);
-						ValueBlock(true, fullRefresh, "AP HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+						ValueBlock(true, fullRefresh, "AP HDG", _autopilotHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, ref fullRefreshPending, Color.White);
 						if (_autopilotStatus != ' ' && _autopilotStatus != 'M')
 						{
-							ValueBlock(false, fullRefresh, "AP DES HDG", _autopilotDesiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, Color.White);
+							ValueBlock(false, fullRefresh, "AP DES HDG", _autopilotDesiredHeading.Degrees.ToString("F0") + "°", string.Empty, ref y, ref fullRefreshPending, Color.White);
 						}
 					}
 
 					hadData = true;
 
-					_display.UpdateScreen();
+					if (!fullRefreshPending)
+					{
+						_display.UpdateScreen();
+					}
 				}
 				else if (hadData)
 				{
@@ -680,15 +696,19 @@ namespace AutoPilotControl
 			{
 				'S' => "Auto",
 				'T' => "Track",
-				'M' => "Manual",
+				'M' => "Standby",
 				'W' => "Wind",
 				_ => "Offline",
 			};
 			return status;
 		}
 
-		private void ValueBlock(bool singleLine, bool fullRefresh, string label, string value, string unit, ref int y, Color color)
+		private void ValueBlock(bool singleLine, bool fullRefresh, string label, string value, string unit, ref int y, ref bool cancel, Color color)
 		{
+			if (cancel)
+			{
+				return;
+			}
 			Size labelSize = _gfx.MeasureString(label, _mediumFont, 2, 8);
 			Size valueSize = _gfx.MeasureString(value, _bigFont, 2, 4);
 			Size unitSize = _gfx.MeasureString(unit, _mediumFont, 0, 0);
@@ -702,12 +722,20 @@ namespace AutoPilotControl
 				{
 					_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
 					_gfx.DrawTextEx(value, _bigFont, labelSize.Width, y, color);
+					if (cancel)
+					{
+						return;
+					}
 					_gfx.DrawTextEx(unit, _mediumFont, labelSize.Width + valueSize.Width, y + offset, color);
 				}
 				else
 				{
 					_display.FastFillRectangle(labelSize.Width, y, _display.Width, y + valueSize.Height, 0);
 					_gfx.DrawTextEx(value, _bigFont, labelSize.Width, y, color);
+					if (cancel)
+					{
+						return;
+					}
 					_gfx.DrawTextEx(unit, _mediumFont, labelSize.Width + valueSize.Width, y + offset, color);
 				}
 
@@ -720,6 +748,10 @@ namespace AutoPilotControl
 					_gfx.DrawTextEx(label, _mediumFont, 0, y, color);
 					y += labelSize.Height;
 					_gfx.DrawTextEx(value, _bigFont, 0, y, color);
+					if (cancel)
+					{
+						return;
+					}
 					_gfx.DrawTextEx(unit, _mediumFont, valueSize.Width, y + offset, color);
 					y += valueSize.Height;
 				}
@@ -728,6 +760,10 @@ namespace AutoPilotControl
 					y += labelSize.Height;
 					_display.FastFillRectangle(0, y, _display.Width, _bigFont.Height + y, 0);
 					_gfx.DrawTextEx(value, _bigFont, 0, y, color);
+					if (cancel)
+					{
+						return;
+					}
 					_gfx.DrawTextEx(unit, _mediumFont, valueSize.Width, y + offset, color);
 					y += valueSize.Height;
 				}
