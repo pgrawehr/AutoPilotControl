@@ -78,7 +78,7 @@ namespace AutoPilotControl
 		private int _drawPositionX;
 		private int _drawPositionY;
 
-		private FrameBuffer1BitPerPixel _bitBuffer;
+		private IFrameBuffer _bitBuffer;
 
 		public Gdew0154M09(int resetPin, int commandDataPin, int busyPin, SpiDevice bus, int csPin = -1, GpioController controller = null, bool shouldDispose = true)
 		{
@@ -110,7 +110,7 @@ namespace AutoPilotControl
 
 			int bits = Width * Height / 8;
 
-			_bitBuffer = new FrameBuffer1BitPerPixel(Height, Width);
+			_bitBuffer = new FrameBuffer1BitPerPixelFast(Height, Width);
 			_bitBuffer.StartPoint = new Point(0, 0);
 			////_resetPin.Write(PinValue.Low);
 			////Thread.Sleep(100); // It's not documented how long we have to wait
@@ -166,7 +166,7 @@ namespace AutoPilotControl
 		public IFrameBuffer CloneFrameBuffer()
 		{
 			IFrameBuffer ret = _bitBuffer;
-			_bitBuffer = new FrameBuffer1BitPerPixel(_bitBuffer.Height, _bitBuffer.Width, (byte[])_bitBuffer.Buffer.Clone());
+			_bitBuffer = new FrameBuffer1BitPerPixelFast(_bitBuffer.Height, _bitBuffer.Width, (byte[])_bitBuffer.Buffer.Clone());
 			return ret;
 		}
 

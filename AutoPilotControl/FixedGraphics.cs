@@ -35,9 +35,18 @@ namespace AutoPilotControl
 					line += fontHeight + 1;
 				}
 
+				if (line + fontHeight >= gfx.EPaperDisplay.Height)
+				{
+					// Early abort when trying to write at bottom of screen.
+					// So we don't have to do the per-pixel test below
+					break;
+				}
+
 				var characterBitmap = font[character];
 
 				var xPos = x + col;
+
+				FrameBuffer1BitPerPixelFast fast = (FrameBuffer1BitPerPixelFast)gfx.EPaperDisplay.FrameBuffer;
 
 				if (bytesPerChar > 1)
 				{
@@ -65,11 +74,13 @@ namespace AutoPilotControl
 							continue;
 						}
 
+						int yTimesWidth = yPos * fast.Width;
 						for (var pixel = 0; pixel < fontWidth; pixel++)
 						{
 							if ((b & bitMask) != 0)
 							{
-								gfx.DrawPixel(xPos + pixel, yPos, color);
+								fast.SetPixelOn(xPos + pixel, yTimesWidth);
+								// gfx.DrawPixel(xPos + pixel, yPos, color);
 							}
 
 							bitMask <<= 1;
