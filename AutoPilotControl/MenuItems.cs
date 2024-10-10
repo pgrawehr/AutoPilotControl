@@ -24,20 +24,12 @@ namespace AutoPilotControl
 	internal class MenuItems
 	{
 		private const int UDP_PORT = 10101;
-		private const int LED_PIN = 10;
-		private readonly GpioController _controller;
 		private readonly Gdew0154M09 _display;
 		private readonly Pcf8563 _rtc;
+		private readonly GpioHandling _pinHandling;
 
 		private readonly Graphics _gfx;
 
-		private PwmChannel _speaker;
-
-		private GpioPin _led;
-		private GpioPin _up;
-		private GpioPin _down;
-		private GpioPin _enter;
-		private GpioPin _topButton;
 		private IFont _bigFont;
 		private IFont _mediumFont;
 
@@ -54,60 +46,32 @@ namespace AutoPilotControl
 		private Angle _autopilotDesiredHeading = Angle.Zero;
 		private bool _autopilotDesiredHeadingValid = false;
 
-		public MenuItems(GpioController controller, Pcf8563 rtc)
+		public MenuItems(GpioHandling pinHandling, Pcf8563 rtc)
 		{
-			_controller = controller;
+			_pinHandling = pinHandling;
 			_rtc = rtc;
 
 			var connectionSettings = new SpiConnectionSettings(1, -1);
 
 			var spiDevice = SpiDevice.Create(connectionSettings);
-			_display = new Gdew0154M09(0, 15, 4, spiDevice, 9, _controller, false);
+			_display = new Gdew0154M09(0, 15, 4, spiDevice, 9, new GpioController(), false);
 			_display.Clear(true);
 			_display.SetInvertMode(true);
 
 			_gfx = new Graphics(_display);
-			_led = _controller.OpenPin(LED_PIN, PinMode.Output);
-			_led.Write(PinValue.Low);
-			_up = _controller.OpenPin(37, PinMode.Input);
-			_enter = _controller.OpenPin(38, PinMode.Input);
-			_down = _controller.OpenPin(39, PinMode.Input);
-			_topButton = _controller.OpenPin(5, PinMode.Input);
+			
 			_position = new GeographicPosition();
 
 			_bigFont = new Font16x26Reduced();
 			_mediumFont = _bigFont;
 
-			_speaker = PwmChannel.CreateFromPin(2, 1000, 0.5);
-			_speaker.Start(); // To make sure it goes off
-			_speaker.Stop();
 			_destinationWp = string.Empty;
 		}
 
-		private event Action BackButtonClicked;
-
-		private event Action UpButtonClicked;
 		
-		private event Action DownButtonClicked;
-
-		private event Action EnterButtonClicked;
-
-		public void Beep()
-		{
-			lock (_speaker)
-			{
-				_speaker.Frequency = 1000;
-				_speaker.Start();
-				Thread.Sleep(50);
-				_speaker.Stop();
-			}
-		}
 
 		public void Run()
 		{
-			// Led should be high in idle state
-			_led.Write(PinValue.High);
-
 			Startup();
 
 			bool exit = false;
@@ -118,13 +82,7 @@ namespace AutoPilotControl
 
 			mainMenu.Add(new MenuEntry("Blink Led", () =>
 			{
-				for (int i = 0; i < 10; i++)
-				{
-					_led.Toggle();
-					Thread.Sleep(200);
-				}
-
-				_led.Write(PinValue.High);
+				_pinHandling.BlinkLed(500, 10);
 			}));
 
 			mainMenu.Add(new MenuEntry("Show Clock", ShowClock));
@@ -136,7 +94,6 @@ namespace AutoPilotControl
 				ShowMenu("Main menu", mainMenu);
 			}
 
-			_led.Write(PinValue.High);
 			_display.Clear(true);
 
 			_display.PowerOff();
@@ -207,10 +164,7 @@ namespace AutoPilotControl
 
 		private void WaitNoButtonsPressed()
 		{
-			while (_up.Read() == PinValue.Low || _down.Read() == PinValue.Low || _enter.Read() == PinValue.Low || _topButton.Read() == PinValue.Low)
-			{
-				Thread.Sleep(10);
-			}
+			_pinHandling.WaitNoButtonsPressed();
 		}
 
 		private void ShowMenu(string title, ArrayList menuOptions)
@@ -257,11 +211,10 @@ namespace AutoPilotControl
 
 				while (true)
 				{
-					if (_down.Read() == PinValue.Low)
+					if (_pinHandling.DownButtonWasClicked(true))
 					{
 						if (selectedEntry < menuOptions.Count - 1)
 						{
-							Beep();
 							// Inverse again to un-mark the selected entry
 							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
 							selectedEntry++;
@@ -269,11 +222,10 @@ namespace AutoPilotControl
 						}
 					}
 
-					if (_up.Read() == PinValue.Low)
+					if (_pinHandling.UpButtonWasClicked(true))
 					{
 						if (selectedEntry > 0)
 						{
-							Beep();
 							// Inverse again to un-mark the selected entry
 							_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
 							selectedEntry--;
@@ -281,9 +233,8 @@ namespace AutoPilotControl
 						}
 					}
 
-					if (_enter.Read() == PinValue.Low)
+					if (_pinHandling.EnterButtonWasClicked())
 					{
-						Beep();
 						MenuEntry menuEntry = (MenuEntry)menuOptions[selectedEntry];
 						menuEntry.Execute();
 						WaitNoButtonsPressed();
@@ -317,30 +268,6 @@ namespace AutoPilotControl
 			Thread.Sleep(2000);
 		}
 
-		private void OnBackButtonClicked(object sender, PinValueChangedEventArgs e)
-		{
-			Beep();
-			BackButtonClicked?.Invoke();
-		}
-
-		void OnUpButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
-		{
-			Beep();
-			UpButtonClicked?.Invoke();
-		}
-
-		void OnDownButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
-		{
-			Beep();
-			DownButtonClicked?.Invoke();
-		}
-
-		void OnEnterButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
-		{
-			Beep();
-			EnterButtonClicked?.Invoke();
-		}
-
 		private void OnNewMessage(NmeaSentence sentence)
 		{
 			if (sentence is RecommendedMinimumNavigationInformation rmc)
@@ -370,13 +297,6 @@ namespace AutoPilotControl
 				_autopilotDesiredHeading = htd.DesiredHeading;
 				_autopilotDesiredHeadingValid = htd.DesiredHeadingValid;
 			}
-		}
-
-		private void ClearEvents()
-		{
-			BackButtonClicked = null;
-			UpButtonClicked = null;
-			DownButtonClicked = null;
 		}
 
 		private Angle AddAngle(Angle angle, Angle correction)
@@ -412,11 +332,6 @@ namespace AutoPilotControl
 
 			bool cancel = false;
 
-			BackButtonClicked += () =>
-			{
-				leave = true;
-				cancel = true;
-			};
 			string lastStatus = string.Empty;
 
 			bool hasValidDesiredHeading = false;
@@ -425,48 +340,6 @@ namespace AutoPilotControl
 			bool firstTime = true;
 
 			int correctionValue = 0;
-			DownButtonClicked += () =>
-			{
-				Interlocked.Increment(ref correctionValue);
-				while (_down.Read() == PinValue.Low)
-				{
-					// Continue incrementing until the button is released
-					Interlocked.Increment(ref correctionValue);
-					Thread.Sleep(50);
-					lock (_speaker)
-					{
-						_speaker.Frequency = 800;
-						_speaker.Start();
-						Thread.Sleep(20);
-						_speaker.Stop();
-					}
-				}
-			};
-
-			UpButtonClicked += () =>
-			{
-				Interlocked.Decrement(ref correctionValue);
-				while (_up.Read() == PinValue.Low)
-				{
-					// Continue decrementing until the button is released
-					Interlocked.Decrement(ref correctionValue);
-					Thread.Sleep(50);
-					lock (_speaker)
-					{
-						_speaker.Frequency = 1400;
-						_speaker.Start();
-						Thread.Sleep(20);
-						_speaker.Stop();
-					}
-				}
-			};
-
-			EnterButtonClicked += () =>
-			{
-				enterMenu = true;
-				cancel = true;
-			};
-
 
 			ArrayList modeMenu = new ArrayList();
 			modeMenu.Add(new MenuEntry("Standby", () => SendHeadingCorrection('M', Angle.Zero, false, false, ps)));
@@ -526,8 +399,6 @@ namespace AutoPilotControl
 						narrowDeadbandLimit, ps);
 				}
 			}
-
-			ClearEvents();
 		}
 
 		private void SendHeadingCorrection(char newStatus, Angle newAngle, bool newAngleValid, bool narrowDeadBandMode, NmeaParser ps)
@@ -550,10 +421,6 @@ namespace AutoPilotControl
 		public void ParserMode()
 		{
 			NmeaParser ps = new NmeaParser(UDP_PORT);
-			_controller.RegisterCallbackForPinValueChangedEvent(_topButton.PinNumber, PinEventTypes.Falling, OnBackButtonClicked);
-			_controller.RegisterCallbackForPinValueChangedEvent(_up.PinNumber, PinEventTypes.Falling, OnUpButtonClicked);
-			_controller.RegisterCallbackForPinValueChangedEvent(_down.PinNumber, PinEventTypes.Falling, OnDownButtonClicked);
-			_controller.RegisterCallbackForPinValueChangedEvent(_enter.PinNumber, PinEventTypes.Falling, OnEnterButtonClicked);
 
 			bool leave = false;
 			ArrayList modes = new ArrayList();
@@ -577,11 +444,6 @@ namespace AutoPilotControl
 			{
 				ps.StopDecode();
 				ps.Dispose();
-
-				_controller.UnregisterCallbackForPinValueChangedEvent(_topButton.PinNumber, OnBackButtonClicked);
-				_controller.UnregisterCallbackForPinValueChangedEvent(_up.PinNumber, OnUpButtonClicked);
-				_controller.UnregisterCallbackForPinValueChangedEvent(_down.PinNumber, OnDownButtonClicked);
-				_controller.UnregisterCallbackForPinValueChangedEvent(_enter.PinNumber, OnEnterButtonClicked);
 			}
 		}
 
@@ -592,36 +454,36 @@ namespace AutoPilotControl
 			bool fullRefreshPending = true;
 			bool nmeaParserRunning = true; // Require a full refresh. Also used as interrupt signal
 
-			UpButtonClicked += () =>
-			{
-				if (page > 0)
-				{
-					page--;
-				}
-				else
-				{
-					page = numPages - 1;
-				}
-
-				fullRefreshPending = true;
-			};
-
-			DownButtonClicked += () =>
-			{
-				page = (page + 1) % numPages;
-				fullRefreshPending = true;
-			};
-
-			BackButtonClicked += () =>
-			{
-				nmeaParserRunning = false;
-				fullRefreshPending = true;
-			};
-
 			bool hadData = true; // flag to avoid constantly redrawing the no-data symbol, which is expensive
 			while (nmeaParserRunning)
 			{
 				bool fullRefresh = false;
+				if (_pinHandling.UpButtonWasClicked(true))
+				{
+					if (page > 0)
+					{
+						page--;
+					}
+					else
+					{
+						page = numPages - 1;
+					}
+
+					fullRefreshPending = true;
+				}
+
+				if (_pinHandling.DownButtonWasClicked(true))
+				{
+					page = (page + 1) % numPages;
+					fullRefreshPending = true;
+				}
+
+				if (_pinHandling.TopButtonWasClicked())
+				{
+					nmeaParserRunning = false;
+					continue;
+				}
+
 				if (fullRefreshPending)
 				{
 					_display.Clear(false);

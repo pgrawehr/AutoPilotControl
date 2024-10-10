@@ -16,13 +16,10 @@ namespace AutoPilotControl
 {
 	public class Program
 	{
-		private static GpioController s_GpioController;
 		private static Pcf8563 s_rtc;
 
 		public static void Main()
 		{
-			s_GpioController = new GpioController();
-
 			// You can get the values of SpiBus
 			SpiBusInfo spiBusInfo = SpiDevice.GetBusInfo(1);
 			Debug.WriteLine($"{nameof(spiBusInfo.MaxClockFrequency)}: {spiBusInfo.MaxClockFrequency}");
@@ -55,12 +52,13 @@ namespace AutoPilotControl
 
 			var dt = DateTime.UtcNow;
 			Debug.WriteLine($"Startup Time: {dt.ToString("yyyy/MM/dd HH:mm:ss")}");
-
-			MenuItems menu = new MenuItems(s_GpioController, s_rtc);
+			var handler = new GpioHandling();
+			handler.Init();
+			MenuItems menu = new MenuItems(handler, s_rtc);
 			menu.Run();
-
+			handler.Dispose();
 			Sleep.EnableWakeupByPin(Sleep.WakeupGpioPin.Pin27, 0);
-			// Sleep.StartDeepSleep(); // Works, but how to get it back alive?
+			Sleep.StartDeepSleep(); // Works, but how to get it back alive?
 		}
 	}
 }

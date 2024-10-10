@@ -21,6 +21,7 @@
     <Compile Include="FixedGraphics.cs" />
     <Compile Include="FrameBuffer1BitPerPixelFast.cs" />
     <Compile Include="Gdew0154M09.cs" />
+    <Compile Include="GpioHandling.cs" />
     <Compile Include="MenuItems.cs" />
     <Compile Include="Nmea0183\GeographicPosition.cs" />
     <Compile Include="Nmea0183\GeographicPositionExtensions.cs" />
