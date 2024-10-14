@@ -58,7 +58,10 @@ namespace AutoPilotControl
 			menu.Run();
 			handler.Dispose();
 			Sleep.EnableWakeupByPin(Sleep.WakeupGpioPin.Pin27, 0);
-			Sleep.StartDeepSleep(); // Works, but how to get it back alive?
+			if (!Debugger.IsAttached)
+			{
+				Sleep.StartDeepSleep(); // Works, but how to get it back alive?
+			}
 		}
 	}
 }

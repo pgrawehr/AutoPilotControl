@@ -478,7 +478,7 @@ namespace AutoPilotControl
 					fullRefreshPending = true;
 				}
 
-				if (_pinHandling.TopButtonWasClicked())
+				if (_pinHandling.BackButtonWasClicked())
 				{
 					nmeaParserRunning = false;
 					continue;

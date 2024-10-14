@@ -16,18 +16,22 @@ namespace AutoPilotControl
 		private GpioPin _up;
 		private GpioPin _down;
 		private GpioPin _enter;
-		private GpioPin _topButton;
+		private GpioPin _backButton;
 
 		private int _upButtonCounts;
 		private int _downButtonCounts;
 		private int _enterButtonCounts;
-		private int _topButtonCounts;
+		private int _backButtonCounts;
+
+		private Thread _buttonThread;
+		private bool _terminate;
 
 		private PwmChannel _speaker;
 
 		public GpioHandling()
 		{
 			_controller = new GpioController();
+			_buttonThread = new Thread(ButtonPollThread);
 		}
 
 		public void Init()
@@ -35,20 +39,77 @@ namespace AutoPilotControl
 			_up = _controller.OpenPin(37, PinMode.Input);
 			_enter = _controller.OpenPin(38, PinMode.Input);
 			_down = _controller.OpenPin(39, PinMode.Input);
-			_topButton = _controller.OpenPin(5, PinMode.Input);
+			_backButton = _controller.OpenPin(5, PinMode.Input);
 
 			_led = _controller.OpenPin(LED_PIN, PinMode.Output);
 			// If the output is high, the led is off
 			_led.Write(PinValue.High);
 
-			_controller.RegisterCallbackForPinValueChangedEvent(_topButton.PinNumber, PinEventTypes.Falling, OnBackButtonClicked);
-			_controller.RegisterCallbackForPinValueChangedEvent(_up.PinNumber, PinEventTypes.Falling, OnUpButtonClicked);
-			_controller.RegisterCallbackForPinValueChangedEvent(_down.PinNumber, PinEventTypes.Falling, OnDownButtonClicked);
-			_controller.RegisterCallbackForPinValueChangedEvent(_enter.PinNumber, PinEventTypes.Falling, OnEnterButtonClicked);
+			// Just not working as expected: Will trigger on the wrong edge and repeatedly, even if the status clearly
+			// does not change.
+			//_controller.RegisterCallbackForPinValueChangedEvent(_topButton.PinNumber, PinEventTypes.Rising, OnBackButtonClicked);
+			//_controller.RegisterCallbackForPinValueChangedEvent(_up.PinNumber, PinEventTypes.Rising, OnUpButtonClicked);
+			//_controller.RegisterCallbackForPinValueChangedEvent(_down.PinNumber, PinEventTypes.Rising, OnDownButtonClicked);
+			//_controller.RegisterCallbackForPinValueChangedEvent(_enter.PinNumber, PinEventTypes.Rising, OnEnterButtonClicked);
 
 			_speaker = PwmChannel.CreateFromPin(2, 1000, 0.5);
 			_speaker.Start(); // To make sure it goes off
 			_speaker.Stop();
+
+			_terminate = false;
+			_buttonThread.Start();
+		}
+
+		private void ButtonPollThread()
+		{
+			PinValue topButtonState = _backButton.Read();
+			PinValue enterButtonState = _enter.Read();
+			PinValue upButtonState = _up.Read();
+			PinValue downButtonState = _down.Read();
+			while (!_terminate)
+			{
+				var newState = _backButton.Read();
+				if (newState != topButtonState)
+				{
+					OnBackButtonClicked(this,
+						newState == PinValue.High
+							? new PinValueChangedEventArgs(PinEventTypes.Rising, _backButton.PinNumber) : 
+							new PinValueChangedEventArgs(PinEventTypes.Falling, _backButton.PinNumber));
+					topButtonState = newState;
+				}
+
+				newState = _enter.Read();
+				if (newState != enterButtonState)
+				{
+					OnEnterButtonClicked(this,
+						newState == PinValue.High
+							? new PinValueChangedEventArgs(PinEventTypes.Rising, _enter.PinNumber) :
+							new PinValueChangedEventArgs(PinEventTypes.Falling, _enter.PinNumber));
+					enterButtonState = newState;
+				}
+
+				newState = _up.Read();
+				if (newState != upButtonState)
+				{
+					OnUpButtonClicked(this,
+						newState == PinValue.High
+							? new PinValueChangedEventArgs(PinEventTypes.Rising, _up.PinNumber) :
+							new PinValueChangedEventArgs(PinEventTypes.Falling, _up.PinNumber));
+					upButtonState = newState;
+				}
+
+				newState = _down.Read();
+				if (newState != downButtonState)
+				{
+					OnDownButtonClicked(this,
+						newState == PinValue.High
+							? new PinValueChangedEventArgs(PinEventTypes.Rising, _down.PinNumber) :
+							new PinValueChangedEventArgs(PinEventTypes.Falling, _down.PinNumber));
+					downButtonState = newState;
+				}
+
+				Thread.Sleep(50);
+			}
 		}
 
 		public void ClearEventHandlers()
@@ -57,7 +118,7 @@ namespace AutoPilotControl
 
 		public void WaitNoButtonsPressed()
 		{
-			while (_up.Read() == PinValue.Low || _down.Read() == PinValue.Low || _enter.Read() == PinValue.Low || _topButton.Read() == PinValue.Low)
+			while (_up.Read() == PinValue.Low || _down.Read() == PinValue.Low || _enter.Read() == PinValue.Low || _backButton.Read() == PinValue.Low)
 			{
 				Thread.Sleep(10);
 			}
@@ -65,7 +126,7 @@ namespace AutoPilotControl
 			{
 				_downButtonCounts = 0;
 				_upButtonCounts = 0;
-				_topButtonCounts = 0;
+				_backButtonCounts = 0;
 				_enterButtonCounts = 0;
 			}
 		}
@@ -94,22 +155,28 @@ namespace AutoPilotControl
 
 		public void Dispose()
 		{
+			_terminate = true;
+			_buttonThread.Join();
 			ClearEventHandlers();
 
-			_controller.UnregisterCallbackForPinValueChangedEvent(_topButton.PinNumber, OnBackButtonClicked);
-			_controller.UnregisterCallbackForPinValueChangedEvent(_up.PinNumber, OnUpButtonClicked);
-			_controller.UnregisterCallbackForPinValueChangedEvent(_down.PinNumber, OnDownButtonClicked);
-			_controller.UnregisterCallbackForPinValueChangedEvent(_enter.PinNumber, OnEnterButtonClicked);
+			//_controller.UnregisterCallbackForPinValueChangedEvent(_topButton.PinNumber, OnBackButtonClicked);
+			//_controller.UnregisterCallbackForPinValueChangedEvent(_up.PinNumber, OnUpButtonClicked);
+			//_controller.UnregisterCallbackForPinValueChangedEvent(_down.PinNumber, OnDownButtonClicked);
+			//_controller.UnregisterCallbackForPinValueChangedEvent(_enter.PinNumber, OnEnterButtonClicked);
 		}
 
 		private void OnBackButtonClicked(object sender, PinValueChangedEventArgs pinValueChangedEventArgs)
 		{
 			lock (_lock)
 			{
-				if (_topButtonCounts == 0)
+				if (pinValueChangedEventArgs.ChangeType == PinEventTypes.Rising)
+				{
+					return;
+				}
+				if (_backButtonCounts == 0)
 				{
 					Beep();
-					_topButtonCounts = 1;
+					_backButtonCounts = 1;
 				}
 			}
 		}
@@ -118,6 +185,10 @@ namespace AutoPilotControl
 		{
 			lock (_lock)
 			{
+				if (pinValueChangedEventArgs.ChangeType == PinEventTypes.Rising)
+				{
+					return;
+				}
 				Beep(850);
 				_upButtonCounts++;
 			}
@@ -163,6 +234,10 @@ namespace AutoPilotControl
 		{
 			lock (_lock)
 			{
+				if (pinValueChangedEventArgs.ChangeType == PinEventTypes.Rising)
+				{
+					return;
+				}
 				Beep(850);
 				_downButtonCounts++;
 			}
@@ -172,6 +247,10 @@ namespace AutoPilotControl
 		{
 			lock (_lock)
 			{
+				if (pinValueChangedEventArgs.ChangeType == PinEventTypes.Rising)
+				{
+					return;
+				}
 				if (_enterButtonCounts == 0)
 				{
 					Beep();
@@ -194,13 +273,13 @@ namespace AutoPilotControl
 			}
 		}
 
-		public bool TopButtonWasClicked()
+		public bool BackButtonWasClicked()
 		{
 			lock (_lock)
 			{
-				if (_topButtonCounts > 0)
+				if (_backButtonCounts > 0)
 				{
-					_topButtonCounts = 0;
+					_backButtonCounts = 0;
 					return true;
 				}
 
