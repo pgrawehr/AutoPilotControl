@@ -45,6 +45,7 @@ namespace AutoPilotControl
 		private char _autopilotStatus = ' ';
 		private Angle _autopilotDesiredHeading = Angle.Zero;
 		private bool _autopilotDesiredHeadingValid = false;
+		private int _newMessagesReceived = 0;
 
 		public MenuItems(GpioHandling pinHandling, Pcf8563 rtc)
 		{
@@ -296,6 +297,7 @@ namespace AutoPilotControl
 				_autopilotStatus = htd.Status.Length >= 1 ? htd.Status[0] : ' ';
 				_autopilotDesiredHeading = htd.DesiredHeading;
 				_autopilotDesiredHeadingValid = htd.DesiredHeadingValid;
+				Interlocked.Increment(ref _newMessagesReceived);
 			}
 		}
 
@@ -326,8 +328,6 @@ namespace AutoPilotControl
 
 		private void AutopilotControlMenu(NmeaParser ps)
 		{
-			bool leave = false;
-			bool enterMenu = false;
 			_display.Clear(false);
 
 			bool cancel = false;
@@ -335,11 +335,17 @@ namespace AutoPilotControl
 			string lastStatus = string.Empty;
 
 			bool hasValidDesiredHeading = false;
-			Angle desiredHeading = Angle.Zero;
+
+			// The value reported from the AP as desired heading
+			double activeDesiredHeading = 0;
+
+			// The value we would want the desired heading to be.
+			double newDesiredHeading = 0;
+			bool hasNewDesiredValue = false;
+
+			// We don't have the message to set this one yet.
 			bool narrowDeadbandLimit = false;
 			bool firstTime = true;
-
-			int correctionValue = 0;
 
 			ArrayList modeMenu = new ArrayList();
 			modeMenu.Add(new MenuEntry("Standby", () => SendHeadingCorrection('M', Angle.Zero, false, false, ps)));
@@ -350,7 +356,8 @@ namespace AutoPilotControl
 
 			// Only calculate the menu once (ideally even right here, at startup)
 			IFrameBuffer menuBackupBuffer = null;
-			while (!leave)
+			int messageCnt = _newMessagesReceived;
+			while (true)
 			{
 				int y = 2;
 				var status = AutopilotStatusString();
@@ -363,40 +370,80 @@ namespace AutoPilotControl
 				y += textSize.Height + 2;
 				ValueBlock(false, firstTime, "Current HDG", _autopilotHeading.Degrees.ToString("F0") + "°",
 					string.Empty, ref y, ref cancel, Color.White);
-				string desHdgString = hasValidDesiredHeading ? desiredHeading.Degrees.ToString("F0") + "°" : "N/A";
+				string desHdgString = hasValidDesiredHeading ? activeDesiredHeading.ToString("F0") + "°" : "N/A";
 				ValueBlock(false, firstTime, "Desired HDG", desHdgString, string.Empty, ref y, ref cancel, Color.White);
 
 				firstTime = false;
 				_display.UpdateScreen();
 
-				if (enterMenu)
+				if (_pinHandling.BackButtonWasClicked())
+				{
+					break;
+				}
+
+				if (_pinHandling.EnterButtonWasClicked())
 				{
 					ShowMenu("Change Mode", modeMenu, true, ref menuBackupBuffer);
-					enterMenu = false;
-					Interlocked.Exchange(ref correctionValue, 0);
 					_display.Clear(false);
 					firstTime = true;
 					cancel = false;
+				}
+
+				if (_pinHandling.IsDownButtonPressed())
+				{
+					if (hasNewDesiredValue)
+					{
+						newDesiredHeading += 1.0;
+					}
+					else
+					{
+						newDesiredHeading = (activeDesiredHeading + 1) % 360;
+						hasNewDesiredValue = true;
+					}
+				}
+
+				if (_pinHandling.IsUpButtonPressed())
+				{
+					if (hasNewDesiredValue)
+					{
+						newDesiredHeading -= 1.0;
+					}
+					else
+					{
+						newDesiredHeading = (activeDesiredHeading - 1);
+						hasNewDesiredValue = true;
+					}
+
+					if (newDesiredHeading < 0)
+					{
+						newDesiredHeading = newDesiredHeading + 360;
+					}
 				}
 
 				if (IsAutopilotActive())
 				{
 					if (_autopilotDesiredHeadingValid)
 					{
-						desiredHeading = _autopilotDesiredHeading;
+						activeDesiredHeading = _autopilotDesiredHeading.Degrees;
 						hasValidDesiredHeading = true;
+					}
+
+					if (hasNewDesiredValue)
+					{
+						Debug.WriteLine($"Requesting heading of {newDesiredHeading}°");
+						SendHeadingCorrection(_autopilotStatus, Angle.FromDegrees(newDesiredHeading), true, narrowDeadbandLimit, ps);
+					}
+
+					int tmp = _newMessagesReceived;
+					if (messageCnt != tmp)
+					{
+						messageCnt = tmp;
+						hasNewDesiredValue = false;
 					}
 				}
 				else
 				{
 					narrowDeadbandLimit = false;
-				}
-
-				int delta = Interlocked.Exchange(ref correctionValue, 0);
-				if (delta != 0)
-				{
-					SendHeadingCorrection(_autopilotStatus, AddAngle(desiredHeading, Angle.FromDegrees(delta)), true,
-						narrowDeadbandLimit, ps);
 				}
 			}
 		}

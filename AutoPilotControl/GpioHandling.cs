@@ -194,6 +194,16 @@ namespace AutoPilotControl
 			}
 		}
 
+		public bool IsDownButtonPressed()
+		{
+			return _down.Read() == PinValue.Low;
+		}
+
+		public bool IsUpButtonPressed()
+		{
+			return _up.Read() == PinValue.Low;
+		}
+
 		public bool UpButtonWasClicked(bool andReset)
 		{
 			lock (_lock)
