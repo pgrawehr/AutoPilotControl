@@ -174,9 +174,13 @@ namespace AutoPilotControl
 			ShowMenu(title, menuOptions, false, ref dummy);
 		}
 
-		private void ShowMenu(String title, ArrayList menuOptions, bool doSaveBuffer, ref IFrameBuffer menuRestoreBuffer)
+		private void ShowMenu(String title, ArrayList menuOptions, bool doSaveBuffer, ref IFrameBuffer menuRestoreBuffer, int initialEntry = 0)
 		{
-			int selectedEntry = 0;
+			int selectedEntry = initialEntry;
+			if (selectedEntry < 0 || selectedEntry >= menuOptions.Count)
+			{
+				selectedEntry = 0;
+			}
 			if (menuRestoreBuffer == null)
 			{
 				_display.Clear(false);
@@ -206,9 +210,6 @@ namespace AutoPilotControl
 				_display.InverseFillRectangle(0, yStart, 200, yStart + _bigFont.Height + 2);
 
 				_display.UpdateScreen();
-
-				// Debouncing helper (initially set, as we expect no buttons to be pressed when a menu is first displayed)
-				WaitNoButtonsPressed();
 
 				while (true)
 				{
@@ -241,7 +242,11 @@ namespace AutoPilotControl
 						WaitNoButtonsPressed();
 						return;
 					}
+
+					Thread.Sleep(10);
 				}
+
+				WaitNoButtonsPressed();
 			}
 		}
 
@@ -375,7 +380,7 @@ namespace AutoPilotControl
 
 				firstTime = false;
 				_display.UpdateScreen();
-
+				Thread.Sleep(0);
 				if (_pinHandling.BackButtonWasClicked())
 				{
 					break;
@@ -383,40 +388,60 @@ namespace AutoPilotControl
 
 				if (_pinHandling.EnterButtonWasClicked())
 				{
-					ShowMenu("Change Mode", modeMenu, true, ref menuBackupBuffer);
+					var currentIndex = _autopilotStatus switch
+					{
+						// If it's currently in standby, suggest auto, otherwise suggest standby
+						'S' => 0,
+						'T' => 0,
+						'M' => 1,
+						'W' => 0,
+						_ => 0,
+					};
+					ShowMenu("Change Mode", modeMenu, true, ref menuBackupBuffer, currentIndex);
 					_display.Clear(false);
 					firstTime = true;
 					cancel = false;
 				}
 
-				if (_pinHandling.IsDownButtonPressed())
+				// We stay in this loop until the up/down button is released, so we quickly get a number of updates.
+				while (true)
 				{
-					if (hasNewDesiredValue)
+					if (_pinHandling.IsDownButtonPressed())
 					{
-						newDesiredHeading += 1.0;
+						if (hasNewDesiredValue)
+						{
+							newDesiredHeading += 1.0;
+							_pinHandling.Beep(850);
+							Thread.Sleep(50);
+						}
+						else
+						{
+							newDesiredHeading = (activeDesiredHeading + 1) % 360;
+							hasNewDesiredValue = true;
+						}
+					}
+					else if (_pinHandling.IsUpButtonPressed())
+					{
+						if (hasNewDesiredValue)
+						{
+							newDesiredHeading -= 1.0;
+							_pinHandling.Beep(1200);
+							Thread.Sleep(50);
+						}
+						else
+						{
+							newDesiredHeading = (activeDesiredHeading - 1);
+							hasNewDesiredValue = true;
+						}
+
+						if (newDesiredHeading < 0)
+						{
+							newDesiredHeading = newDesiredHeading + 360;
+						}
 					}
 					else
 					{
-						newDesiredHeading = (activeDesiredHeading + 1) % 360;
-						hasNewDesiredValue = true;
-					}
-				}
-
-				if (_pinHandling.IsUpButtonPressed())
-				{
-					if (hasNewDesiredValue)
-					{
-						newDesiredHeading -= 1.0;
-					}
-					else
-					{
-						newDesiredHeading = (activeDesiredHeading - 1);
-						hasNewDesiredValue = true;
-					}
-
-					if (newDesiredHeading < 0)
-					{
-						newDesiredHeading = newDesiredHeading + 360;
+						break;
 					}
 				}
 
@@ -424,7 +449,7 @@ namespace AutoPilotControl
 				{
 					if (_autopilotDesiredHeadingValid)
 					{
-						activeDesiredHeading = _autopilotDesiredHeading.Degrees;
+						activeDesiredHeading = Math.Round(_autopilotDesiredHeading.Degrees);
 						hasValidDesiredHeading = true;
 					}
 

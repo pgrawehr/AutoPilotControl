@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Device.Gpio;
 using System.Device.Pwm;
+using System.Diagnostics;
 using System.Threading;
 
 namespace AutoPilotControl
@@ -66,6 +67,7 @@ namespace AutoPilotControl
 			PinValue enterButtonState = _enter.Read();
 			PinValue upButtonState = _up.Read();
 			PinValue downButtonState = _down.Read();
+			int count = 0;
 			while (!_terminate)
 			{
 				var newState = _backButton.Read();
@@ -108,7 +110,7 @@ namespace AutoPilotControl
 					downButtonState = newState;
 				}
 
-				Thread.Sleep(50);
+				Thread.Sleep(100);
 			}
 		}
 
@@ -189,7 +191,7 @@ namespace AutoPilotControl
 				{
 					return;
 				}
-				Beep(850);
+				Beep(1200);
 				_upButtonCounts++;
 			}
 		}
