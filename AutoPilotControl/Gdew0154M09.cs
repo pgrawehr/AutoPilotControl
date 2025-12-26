@@ -153,6 +153,11 @@ namespace AutoPilotControl
 			WaitReady(1000, null);
 		}
 
+		public bool WaitReady(CancellationToken cancellationToken)
+		{
+			return true;
+		}
+
 		public void BeginFrameDraw()
 		{
 			// Nothing to do?
@@ -341,6 +346,11 @@ namespace AutoPilotControl
 			{
 				WriteData(data[i]);
 			}
+		}
+
+		public void SendData(params ushort[] data)
+		{
+			throw new NotImplementedException();
 		}
 
 		public void SetPixel(int x, int y, int color)
