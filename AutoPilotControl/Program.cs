@@ -11,6 +11,7 @@ using Iot.Device.Rtc;
 using nanoFramework.Hardware.Esp32;
 using nanoFramework.Runtime.Native;
 using nanoFramework.UI;
+using Iot.Device;
 
 namespace AutoPilotControl
 {
@@ -22,6 +23,9 @@ namespace AutoPilotControl
 		public static void Main()
 		{
 			s_GpioController = new GpioController();
+
+			TestClass testing = new TestClass();
+			testing.Foo();
 
 			// You can get the values of SpiBus
 			SpiBusInfo spiBusInfo = SpiDevice.GetBusInfo(1);

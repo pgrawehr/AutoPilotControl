@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.IL">
+    <PropertyGroup>
+        <TargetFramework>nano1.0</TargetFramework>
+        <MicrosoftNetCoreIlasmPackageVersion>8.0</MicrosoftNetCoreIlasmPackageVersion>
+        <IlasmFlags>$(IlasmFlags) -INCLUDE=$(IncludePath)</IlasmFlags>
+    </PropertyGroup>
+</Project>

@@ -115,6 +115,9 @@
     <Reference Include="System.Threading">
       <HintPath>..\packages\nanoFramework.System.Threading.2.0.0-preview.3\lib\System.Threading.dll</HintPath>
     </Reference>
+    <Reference Include="Iot.Device.ILTesting">
+      <HintPath>..\ILClassLibrary\TextFile1.dll</HintPath>
+    </Reference>
     <Reference Include="UnitsNet.Angle">
       <HintPath>..\packages\UnitsNet.nanoFramework.Angle.6.0.0-pre019\lib\UnitsNet.Angle.dll</HintPath>
     </Reference>
