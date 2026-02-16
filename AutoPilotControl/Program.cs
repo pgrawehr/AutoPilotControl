@@ -24,9 +24,6 @@ namespace AutoPilotControl
 		{
 			s_GpioController = new GpioController();
 
-			TestClass testing = new TestClass();
-			testing.Foo();
-
 			// You can get the values of SpiBus
 			SpiBusInfo spiBusInfo = SpiDevice.GetBusInfo(1);
 			Debug.WriteLine($"{nameof(spiBusInfo.MaxClockFrequency)}: {spiBusInfo.MaxClockFrequency}");

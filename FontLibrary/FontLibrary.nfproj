@@ -54,7 +54,7 @@
       <HintPath>..\packages\nanoFramework.System.Device.Gpio.2.0.0-preview.4\lib\System.Device.Gpio.dll</HintPath>
     </Reference>
     <Reference Include="System.Device.Spi">
-      <HintPath>..\packages\nanoFramework.System.Device.Spi.2.0.0-preview.3\lib\System.Device.Spi.dll</HintPath>
+      <HintPath>..\packages\nanoFramework.System.Device.Spi.2.0.0-preview.4\lib\System.Device.Spi.dll</HintPath>
     </Reference>
     <Reference Include="System.Threading">
       <HintPath>..\packages\nanoFramework.System.Threading.2.0.0-preview.3\lib\System.Threading.dll</HintPath>

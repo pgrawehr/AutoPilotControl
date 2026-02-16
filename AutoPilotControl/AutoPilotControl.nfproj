@@ -89,10 +89,10 @@
       <HintPath>..\packages\nanoFramework.System.Device.I2c.2.0.0-preview.4\lib\System.Device.I2c.dll</HintPath>
     </Reference>
     <Reference Include="System.Device.Pwm">
-      <HintPath>..\packages\nanoFramework.System.Device.Pwm.2.0.0-preview.1\lib\System.Device.Pwm.dll</HintPath>
+      <HintPath>..\packages\nanoFramework.System.Device.Pwm.2.0.0-preview.2\lib\System.Device.Pwm.dll</HintPath>
     </Reference>
     <Reference Include="System.Device.Spi">
-      <HintPath>..\packages\nanoFramework.System.Device.Spi.2.0.0-preview.3\lib\System.Device.Spi.dll</HintPath>
+      <HintPath>..\packages\nanoFramework.System.Device.Spi.2.0.0-preview.4\lib\System.Device.Spi.dll</HintPath>
     </Reference>
     <Reference Include="System.Device.Wifi">
       <HintPath>..\packages\nanoFramework.System.Device.Wifi.1.5.139\lib\System.Device.Wifi.dll</HintPath>
@@ -114,9 +114,6 @@
     </Reference>
     <Reference Include="System.Threading">
       <HintPath>..\packages\nanoFramework.System.Threading.2.0.0-preview.3\lib\System.Threading.dll</HintPath>
-    </Reference>
-    <Reference Include="Iot.Device.ILTesting">
-      <HintPath>..\ILClassLibrary\TextFile1.dll</HintPath>
     </Reference>
     <Reference Include="UnitsNet.Angle">
       <HintPath>..\packages\UnitsNet.nanoFramework.Angle.6.0.0-pre019\lib\UnitsNet.Angle.dll</HintPath>
